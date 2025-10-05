@@ -1,0 +1,25 @@
+{
+  "name": "lsp-toy",
+  "displayName": "lsp-toy",
+  "description": "LSP Toy Server",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.104.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "lsptoy",
+      "aliases": ["lsptoy", "lsptoy"],
+      "extensions": ["lsptoy"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "lsptoy",
+      "scopeName": "source.lsptoy",
+      "path": "./syntaxes/lsptoy.tmLanguage.json"
+    }]
+  }
+}
