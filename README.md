@@ -1,65 +1,38 @@
-# lsp-toy README
+# lsp-toy
 
-This is the README for your extension "lsp-toy". After writing up a brief description, we recommend including the following sections.
+A VS Code language server that helps you author resume-style Markdown documents inside `.lsptoy` files.
 
-## Features
+## ✨ Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+| Capability | Description | Example Behavior |
+| --- | --- | --- |
+| Diagnostics | Warns on `TODO` comments and relative links that do not resolve on disk. | Highlights `TODO` lines and `[Project](./missing.md)` as warnings. |
+| Code Actions | Offers focused quick fixes for diagnostics. | “Mark TODO as done” or “Remove broken link”. |
+| Completions | Suggests resume sections and Markdown formatting as you type. | Trigger with `#` or `[` for headings, links, and formatting snippets. |
+| Hover | Displays helpful tooltips for well-known technologies and links. | Hover `Rust` to see a short description. |
+| Signature Help | Guides pseudo calls such as `contact("Jane", "Doe")`. | Shows parameter names and descriptions while typing. |
+| Semantic Tokens | Adds semantic coloring for headings, emphasis, links, code spans, and TODOs. | Headings/bold/links receive dedicated token types. |
 
-For example if there is an image subfolder under your extension project workspace:
+## 🚀 Getting started
 
-\!\[feature X\]\(images/feature-x.png\)
+```bash
+npm install
+npm run compile
+```
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+Open `samples/sample-resume.lsptoy`, press <kbd>F5</kbd> to launch the Extension Development Host, and explore diagnostics, completions, hovers, and semantic colors in action.
 
-## Requirements
+## 🧪 Sample document
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+Use `samples/sample-resume.lsptoy` as a playground. It intentionally includes a `TODO` and a broken relative link so you can try the quick fixes. Typing `#` or `[` will surface completion suggestions tailored for résumé authoring.
 
-## Extension Settings
+## 🔧 Development
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
+- `npm run compile` – build both the client and the server once.
+- `npm run watch` – rebuild on every change.
 
-For example:
+The extension entry point lives in `client/src/extension.ts`. The language server logic is implemented in `server/src/server.ts`.
 
-This extension contributes the following settings:
+## 📄 License
 
-* `myExtension.enable`: Enable/disable this extension.
-* `myExtension.thing`: Set to `blah` to do something.
-
-## Known Issues
-
-Calling out known issues can help limit users opening duplicate issues against your extension.
-
-## Release Notes
-
-Users appreciate release notes as you update your extension.
-
-### 1.0.0
-
-Initial release of ...
-
-### 1.0.1
-
-Fixed issue #.
-
-### 1.1.0
-
-Added features X, Y, and Z.
-
----
-
-## Working with Markdown
-
-You can author your README using Visual Studio Code. Here are some useful editor keyboard shortcuts:
-
-* Split the editor (`Cmd+\` on macOS or `Ctrl+\` on Windows and Linux).
-* Toggle preview (`Shift+Cmd+V` on macOS or `Shift+Ctrl+V` on Windows and Linux).
-* Press `Ctrl+Space` (Windows, Linux, macOS) to see a list of Markdown snippets.
-
-## For more information
-
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
-
-**Enjoy!**
+This project is released under the MIT License.

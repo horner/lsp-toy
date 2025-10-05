@@ -6,4 +6,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
-- Initial release
+## [0.1.0] - 2025-10-05
+
+- Introduced a full Markdown-inspired language server for `.lsptoy` files, including diagnostics, code actions, completions, hovers, signature help, and semantic tokens.
+- Added sample document (`samples/sample-resume.lsptoy`) to showcase the language features.

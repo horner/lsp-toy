@@ -10,7 +10,13 @@
 			"type": "extensionHost",
 			"request": "launch",
 			"args": [
-				"--extensionDevelopmentPath=${workspaceFolder}"
+				"--extensionDevelopmentPath=${workspaceFolder}",
+				"${workspaceFolder}/samples/sample-resume.lsptoy"
+			],
+			"preLaunchTask": "npm: compile",
+			"outFiles": [
+				"${workspaceFolder}/client/out/**/*.js",
+				"${workspaceFolder}/server/out/**/*.js"
 			]
 		}
 	]

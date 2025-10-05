@@ -1,0 +1,17 @@
+# Jane Doe
+
+**Email:** [jane.doe@example.com](mailto:jane.doe@example.com)  
+**Website:** [https://janedoe.dev](https://janedoe.dev)
+
+## Summary
+Full-stack engineer exploring **Rust**, **TypeScript**, and _language servers_.
+
+> TODO: Add personal mission statement.
+
+## Skills
+- **Languages:** JavaScript, TypeScript, Python, Rust
+- **Tools:** Docker, Git, Kubernetes
+- [Project Report](./acme-report.md) <!-- intentional broken link -->
+
+## Contact
+Reach me via `contact("Jane", "Doe")`
