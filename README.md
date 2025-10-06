@@ -13,6 +13,7 @@ A VS Code LSP server that helps you author resume-style Markdown documents insid
 | Signature Help | Guides pseudo calls such as `contact("Jane", "Doe")`. | Shows parameter names and descriptions while typing. |
 | Semantic Tokens | Adds semantic coloring for headings, emphasis, links, code spans, and TODOs. | Headings/bold/links receive dedicated token types. |
 | Tree-sitter AST | Uses the `tree-sitter-markdown` grammar (via WASM) for parsing instead of regex heuristics. | Diagnostics and tokens stay in sync with the Markdown structure. |
+| Locale Support | Respects client locale preferences for internationalized messages. | Diagnostic messages appear in Spanish, French, etc. based on VS Code's language. |
 
 ## 🚀 Getting started
 
@@ -156,6 +157,43 @@ Example output:
 ```
 
 See [`DEBUG.md`](./DEBUG.md) for complete debugging guide with all output examples.
+
+## 🌍 Internationalization
+
+The server uses **i18next** for comprehensive internationalization with JSON-based translations. It automatically detects VS Code's display language and localizes:
+
+- 📋 **Diagnostic messages** (with plural support)
+- 💡 **Completion items** (labels, details, documentation)
+- 📖 **Hover text** (with parameter interpolation)
+
+**Supported languages:**
+- 🇺🇸 English (default)
+- 🇪🇸 Spanish
+- 🇫🇷 French
+
+**Add your language!** See [`TRANSLATION_GUIDE.md`](./TRANSLATION_GUIDE.md) for a complete guide to contributing translations.
+
+Test with different locales:
+
+```bash
+LSP_LOCALE=es-ES npm test  # Spanish
+LSP_LOCALE=fr-FR npm test  # French
+```
+
+See [`LOCALE_SUPPORT.md`](./LOCALE_SUPPORT.md) for technical implementation details.
+
+## 🧪 Testing
+
+The project includes automated tests for LSP functionality and localization:
+
+```bash
+npm test              # Run all tests
+npm run test:stdio    # Basic stdio smoke test
+npm run test:i18n     # i18n test suite (all languages)
+npm run test:quiet    # Run tests without debug output
+```
+
+See [`test/README.md`](./test/README.md) for complete test documentation.
 
 ## 📄 License
 

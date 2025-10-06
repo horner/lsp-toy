@@ -1,0 +1,44 @@
+{
+  "diagnostics": {
+    "todo": {
+      "message": "Found TODO item.",
+      "message_plural": "Found {{count}} TODO items."
+    },
+    "brokenLink": {
+      "message": "Broken link",
+      "message_plural": "{{count}} broken links"
+    }
+  },
+  "completion": {
+    "heading": {
+      "label": "Heading",
+      "detail": "Markdown heading",
+      "documentation": "Insert a markdown heading (# through ######)"
+    },
+    "bold": {
+      "label": "Bold",
+      "detail": "Bold text",
+      "documentation": "Make text **bold**"
+    },
+    "italic": {
+      "label": "Italic",
+      "detail": "Italic text",
+      "documentation": "Make text *italic*"
+    },
+    "link": {
+      "label": "Link",
+      "detail": "Markdown link",
+      "documentation": "Insert a [link](url)"
+    },
+    "todo": {
+      "label": "TODO",
+      "detail": "TODO comment",
+      "documentation": "Insert a TODO comment"
+    }
+  },
+  "hover": {
+    "heading": "This is a level {{level}} heading",
+    "todo": "TODO item - remember to complete this task",
+    "link": "Link to: {{url}}"
+  }
+}

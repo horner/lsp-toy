@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+/**
+ * Basic stdio smoke test for LSP server
+ * Tests that the server can start, initialize, and send diagnostics
+ */
+
 const { spawn } = require('node:child_process');
 const { StreamMessageReader, StreamMessageWriter } = require('vscode-jsonrpc/node');
 const { URI } = require('vscode-uri');
@@ -17,13 +22,13 @@ const TEST_TIMEOUT_MS = 10000;
 
 function ensurePrerequisites() {
   if (!fs.existsSync(SERVER_ENTRY)) {
-    console.error('[stdio-smoke] Missing server build. Run "npm run compile" first.');
+    console.error('[test-stdio] Missing server build. Run "npm run compile" first.');
     process.exitCode = 1;
     process.exit();
   }
 
   if (!fs.existsSync(SAMPLE_FILE)) {
-    console.error('[stdio-smoke] Sample document not found:', SAMPLE_FILE);
+    console.error('[test-stdio] Sample document not found:', SAMPLE_FILE);
     process.exitCode = 1;
     process.exit();
   }
@@ -147,7 +152,12 @@ async function main() {
     processId: process.pid,
     rootUri: URI.file(path.resolve(__dirname, '..')).toString(),
     capabilities: {},
-    workspaceFolders: null
+    workspaceFolders: null,
+    locale: process.env.LSP_LOCALE || 'en-US',
+    clientInfo: {
+      name: 'lsp-toy-test-client',
+      version: '0.0.1'
+    }
   };
 
   await sendRequest('initialize', initializeParams);
@@ -183,15 +193,14 @@ async function main() {
     throw new Error(`Server exited with code ${exitCode}`);
   }
 
-  console.log('[stdio-smoke] Diagnostics received successfully.');
+  console.log('[test-stdio] ✓ Test passed: Diagnostics received successfully.');
 }
 
 main().catch(error => {
-  console.error('[stdio-smoke] Test failed:', error?.message ?? error);
+  console.error('[test-stdio] ✗ Test failed:', error?.message ?? error);
   process.exitCode = 1;
 }).finally(() => {
   if (serverProcess && !serverProcess.killed) {
     serverProcess.kill();
   }
-  setTimeout(() => process.exit(), 0);
 });

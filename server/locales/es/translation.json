@@ -1,0 +1,44 @@
+{
+  "diagnostics": {
+    "todo": {
+      "message": "Elemento TODO encontrado.",
+      "message_plural": "{{count}} elementos TODO encontrados."
+    },
+    "brokenLink": {
+      "message": "Enlace roto",
+      "message_plural": "{{count}} enlaces rotos"
+    }
+  },
+  "completion": {
+    "heading": {
+      "label": "Encabezado",
+      "detail": "Encabezado Markdown",
+      "documentation": "Insertar un encabezado markdown (# hasta ######)"
+    },
+    "bold": {
+      "label": "Negrita",
+      "detail": "Texto en negrita",
+      "documentation": "Hacer texto **negrita**"
+    },
+    "italic": {
+      "label": "Cursiva",
+      "detail": "Texto en cursiva",
+      "documentation": "Hacer texto *cursiva*"
+    },
+    "link": {
+      "label": "Enlace",
+      "detail": "Enlace Markdown",
+      "documentation": "Insertar un [enlace](url)"
+    },
+    "todo": {
+      "label": "TODO",
+      "detail": "Comentario TODO",
+      "documentation": "Insertar un comentario TODO"
+    }
+  },
+  "hover": {
+    "heading": "Este es un encabezado de nivel {{level}}",
+    "todo": "Elemento TODO - recuerda completar esta tarea",
+    "link": "Enlace a: {{url}}"
+  }
+}

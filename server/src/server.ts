@@ -37,6 +37,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as net from 'net';
 import { Parser, Language, Tree, Node } from 'web-tree-sitter';
+import i18next from 'i18next';
 
 type SyntaxNode = Node;
 
@@ -93,6 +94,7 @@ async function initializeParser(): Promise<void> {
 let connection: Connection;
 let documents: TextDocuments<TextDocument>;
 let documentTrees: Map<string, Tree>;
+let clientLocale: string | undefined;
 
 const semanticLegend: SemanticTokensLegend = {
   tokenTypes: ['heading', 'bold', 'italic', 'link', 'code', 'todo'],
@@ -115,8 +117,26 @@ async function initializeLanguageServer(newConnection: Connection): Promise<void
   await initializeParser();
   logDebug('Parser initialized!');
 
-  connection.onInitialize((_params: InitializeParams): InitializeResult => {
+  connection.onInitialize(async (params: InitializeParams): Promise<InitializeResult> => {
     logDebug('onInitialize handler called');
+    
+    // Capture client locale preferences
+    clientLocale = params.locale;
+    if (clientLocale) {
+      logDebug('Client locale:', clientLocale);
+      connection.console.log(`Client locale: ${clientLocale}`);
+    } else {
+      logDebug('No locale information provided by client');
+    }
+    
+    // Initialize i18n with the client's locale
+    await initializeI18n(clientLocale);
+    
+    // Log other useful client info
+    if (params.clientInfo) {
+      logDebug('Client info:', `${params.clientInfo.name} ${params.clientInfo.version || 'unknown version'}`);
+    }
+    
     return {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
@@ -210,7 +230,9 @@ documents.onDidOpen(e => {
     const markdownFormats = ['**bold**', '_italic_', '`inline code`', '> Quote', '- List item'];
     const linkSnippets: CompletionItem[] = [
       {
-        label: 'Markdown link',
+        label: t('completion.link.label'),
+        detail: t('completion.link.detail'),
+        documentation: t('completion.link.documentation'),
         kind: CompletionItemKind.Snippet,
         sortText: '10',
         insertText: '[${1:Label}](https://${2:example.com})',
@@ -527,6 +549,49 @@ function validateTextDocument(document: TextDocument): void {
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 
+// Initialize i18next with translation files
+async function initializeI18n(locale?: string): Promise<void> {
+  const lng = locale || 'en';
+  // Extract language code (e.g., 'es' from 'es-ES')
+  const language = lng.split('-')[0];
+  
+  logDebug('Initializing i18n for locale:', lng, '(language:', language + ')');
+  
+  // Load translation files
+  const localesDir = path.join(__dirname, '..', 'locales');
+  const supportedLanguages = ['en', 'es', 'fr'];
+  const resources: Record<string, { translation: Record<string, unknown> }> = {};
+  
+  for (const lang of supportedLanguages) {
+    const translationPath = path.join(localesDir, lang, 'translation.json');
+    if (fs.existsSync(translationPath)) {
+      try {
+        const content = fs.readFileSync(translationPath, 'utf-8');
+        resources[lang] = { translation: JSON.parse(content) as Record<string, unknown> };
+        logDebug('  ✓ Loaded translations for:', lang);
+      } catch (error) {
+        logDebug('  ✗ Failed to load translations for', lang + ':', error);
+      }
+    }
+  }
+  
+  await i18next.init({
+    lng: supportedLanguages.includes(language) ? language : 'en',
+    fallbackLng: 'en',
+    resources,
+    interpolation: {
+      escapeValue: false // Not needed for server-side
+    }
+  });
+  
+  logDebug('  i18n initialized with language:', i18next.language);
+}
+
+// Helper function to get locale-aware messages with i18next
+function t(key: string, options?: { count?: number; [key: string]: unknown }): string {
+  return i18next.t(key, options);
+}
+
 function isLocalLink(target: string): boolean {
   return target.startsWith('./') || target.startsWith('../');
 }
@@ -555,7 +620,7 @@ function getHoverInfo(document: TextDocument, position: Position, tree: Tree): s
       return entry;
     }
     if (word.toLowerCase() === 'todo') {
-      return '**TODO** — reminder to complete this item.';
+      return t('hover.todo');
     }
   }
 
@@ -809,7 +874,7 @@ function addTodoDiagnostics(
     diagnostics.push({
       severity: DiagnosticSeverity.Warning,
       range,
-      message: 'Found TODO item.',
+      message: t('diagnostics.todo.message'),
       source: 'lsp-toy',
       code: 'todo',
       data: { kind: 'todo' }
@@ -837,10 +902,11 @@ function addBrokenLinkDiagnostics(
   const label = (labelNode?.text ?? '').trim();
   const range = rangeFromNode(document, linkNode);
 
+  const brokenLinkMsg = t('diagnostics.brokenLink.message');
   diagnostics.push({
     severity: DiagnosticSeverity.Warning,
     range,
-    message: `Broken link: ${target}`,
+    message: `${brokenLinkMsg}: ${target}`,
     source: 'lsp-toy',
     code: 'brokenLink',
     data: { kind: 'brokenLink', label, target }

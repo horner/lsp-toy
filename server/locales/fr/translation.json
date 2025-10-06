@@ -1,0 +1,44 @@
+{
+  "diagnostics": {
+    "todo": {
+      "message": "Élément TODO trouvé.",
+      "message_plural": "{{count}} éléments TODO trouvés."
+    },
+    "brokenLink": {
+      "message": "Lien cassé",
+      "message_plural": "{{count}} liens cassés"
+    }
+  },
+  "completion": {
+    "heading": {
+      "label": "Titre",
+      "detail": "Titre Markdown",
+      "documentation": "Insérer un titre markdown (# à ######)"
+    },
+    "bold": {
+      "label": "Gras",
+      "detail": "Texte en gras",
+      "documentation": "Mettre le texte en **gras**"
+    },
+    "italic": {
+      "label": "Italique",
+      "detail": "Texte en italique",
+      "documentation": "Mettre le texte en *italique*"
+    },
+    "link": {
+      "label": "Lien",
+      "detail": "Lien Markdown",
+      "documentation": "Insérer un [lien](url)"
+    },
+    "todo": {
+      "label": "TODO",
+      "detail": "Commentaire TODO",
+      "documentation": "Insérer un commentaire TODO"
+    }
+  },
+  "hover": {
+    "heading": "Ceci est un titre de niveau {{level}}",
+    "todo": "Élément TODO - n'oubliez pas de terminer cette tâche",
+    "link": "Lien vers : {{url}}"
+  }
+}
