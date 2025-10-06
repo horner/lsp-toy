@@ -4,7 +4,12 @@ A VS Code LSP server that helps you author resume-style Markdown documents insid
 
 ## ✨ Features
 
-| Capability | Description | Example Behavior |
+| Capability | Description | ExampleThe server uses **i18next** for comprehensive internationalization with JSON-based translations. It automatically detects VS Code's display language and localizes:
+
+- 📋 **Diagnostic messages** (with plural support)
+- 💡 **Completion items** (labels, details, documentation)
+- 📆 **Hover text** (with parameter interpolation)
+- 🌍 **Native TODO keywords** (PENDIENTE, À FAIRE, ZROBIĆ, etc.)vior |
 | --- | --- | --- |
 | Diagnostics | Warns on `TODO` comments and relative links that do not resolve on disk. | Highlights `TODO` lines and `[Project](./missing.md)` as warnings. |
 | Code Actions | Offers focused quick fixes for diagnostics. | "Mark TODO as done" or "Remove broken link". |
@@ -170,6 +175,7 @@ The server uses **i18next** for comprehensive internationalization with JSON-bas
 - 🇺🇸 English (default)
 - 🇪🇸 Spanish
 - 🇫🇷 French
+- 🇵🇱 Polish
 
 **Add your language!** See [`TRANSLATION_GUIDE.md`](./TRANSLATION_GUIDE.md) for a complete guide to contributing translations.
 

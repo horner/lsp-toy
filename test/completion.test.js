@@ -160,6 +160,13 @@ async function main() {
       console.error('[test-completion] ✗ French translation missing');
       success = false;
     }
+  } else if (locale.startsWith('pl')) {
+    if (linkItem.label.toLowerCase().includes('link')) {
+      console.log('[test-completion] ✓ Polish translation verified!');
+    } else {
+      console.error('[test-completion] ✗ Polish translation missing');
+      success = false;
+    }
   } else {
     if (linkItem.label.toLowerCase().includes('link')) {
       console.log('[test-completion] ✓ English (default) verified!');

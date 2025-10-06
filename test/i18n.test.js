@@ -10,7 +10,8 @@ const { spawn } = require('node:child_process');
 const TEST_LOCALES = [
   { code: 'en-US', lang: 'English', linkWord: 'Link' },
   { code: 'es-ES', lang: 'Spanish', linkWord: 'Enlace' },
-  { code: 'fr-FR', lang: 'French', linkWord: 'Lien' }
+  { code: 'fr-FR', lang: 'French', linkWord: 'Lien' },
+  { code: 'pl-PL', lang: 'Polish', linkWord: 'Link' }
 ];
 
 let allPassed = true;

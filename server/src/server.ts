@@ -559,7 +559,7 @@ async function initializeI18n(locale?: string): Promise<void> {
   
   // Load translation files
   const localesDir = path.join(__dirname, '..', 'locales');
-  const supportedLanguages = ['en', 'es', 'fr'];
+  const supportedLanguages = ['en', 'es', 'fr', 'pl'];
   const resources: Record<string, { translation: Record<string, unknown> }> = {};
   
   for (const lang of supportedLanguages) {
@@ -619,7 +619,9 @@ function getHoverInfo(document: TextDocument, position: Position, tree: Tree): s
     if (entry) {
       return entry;
     }
-    if (word.toLowerCase() === 'todo') {
+    // Check if word is any TODO-like keyword
+    const todoKeywords = getTodoKeywords().map(k => k.toLowerCase());
+    if (todoKeywords.includes(word.toLowerCase())) {
       return t('hover.todo');
     }
   }
@@ -802,6 +804,46 @@ function pushNodeToken(
   pushRange(builder, document, lines, node.startIndex, node.endIndex, tokenType);
 }
 
+// Get TODO keywords for all supported languages
+function getTodoKeywords(): string[] {
+  return [
+    // Universal
+    'TODO', 'FIXME', 'HACK', 'NOTE',
+    // English
+    'TODO', 'FIXME', 'BUG', 'HACK', 'NOTE', 'WARNING',
+    // Spanish
+    'PENDIENTE', 'ARREGLAR', 'CORREGIR', 'NOTA', 'ADVERTENCIA',
+    // French
+    'AFAIRE', 'À FAIRE', 'CORRIGER', 'RÉPARER', 'NOTE', 'ATTENTION',
+    // Polish
+    'ZROBIĆ', 'NAPRAWIĆ', 'POPRAWIĆ', 'UWAGA', 'NOTATKA'
+  ];
+}
+
+// Find all TODO-like keywords in text
+function findTodoMatches(text: string): Array<{ keyword: string; index: number; length: number }> {
+  const keywords = getTodoKeywords();
+  const matches: Array<{ keyword: string; index: number; length: number }> = [];
+  
+  for (const keyword of keywords) {
+    let index = text.indexOf(keyword);
+    while (index !== -1) {
+      // Check if it's a whole word (not part of another word)
+      const before = index > 0 ? text[index - 1] : ' ';
+      const after = index + keyword.length < text.length ? text[index + keyword.length] : ' ';
+      const isWholeWord = /\s|^/.test(before) && /\s|$|:/.test(after);
+      
+      if (isWholeWord) {
+        matches.push({ keyword, index, length: keyword.length });
+      }
+      index = text.indexOf(keyword, index + 1);
+    }
+  }
+  
+  // Sort by index to process in order
+  return matches.sort((a, b) => a.index - b.index);
+}
+
 function highlightTodoTokens(
   builder: SemanticTokensBuilder,
   document: TextDocument,
@@ -809,12 +851,12 @@ function highlightTodoTokens(
   node: SyntaxNode
 ): void {
   const text: string = node.text ?? '';
-  let index = text.indexOf('TODO');
-  while (index !== -1) {
-    const start = node.startIndex + index;
-    const end = start + 4;
+  const matches = findTodoMatches(text);
+  
+  for (const match of matches) {
+    const start = node.startIndex + match.index;
+    const end = start + match.length;
     pushRange(builder, document, lines, start, end, 'todo');
-    index = text.indexOf('TODO', index + 4);
   }
 }
 
@@ -866,10 +908,11 @@ function addTodoDiagnostics(
   diagnostics: Diagnostic[]
 ): void {
   const text: string = node.text ?? '';
-  let index = text.indexOf('TODO');
-  while (index !== -1) {
-    const start = node.startIndex + index;
-    const end = start + 4;
+  const matches = findTodoMatches(text);
+  
+  for (const match of matches) {
+    const start = node.startIndex + match.index;
+    const end = start + match.length;
     const range = Range.create(document.positionAt(start), document.positionAt(end));
     diagnostics.push({
       severity: DiagnosticSeverity.Warning,
@@ -877,9 +920,8 @@ function addTodoDiagnostics(
       message: t('diagnostics.todo.message'),
       source: 'lsp-toy',
       code: 'todo',
-      data: { kind: 'todo' }
+      data: { kind: 'todo', keyword: match.keyword }
     });
-    index = text.indexOf('TODO', index + 4);
   }
 }
 

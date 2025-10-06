@@ -70,13 +70,20 @@ Currently implemented translations:
 | `en-US`, `en-*` | English | ✓ Complete |
 | `es-ES`, `es-*` | Spanish | ✓ Complete |
 | `fr-FR`, `fr-*` | French | ✓ Complete |
+| `pl-PL`, `pl-*` | Polish | ✓ Complete |
 
 ### Translated Content
 
 **Diagnostics:**
-- TODO items
+- TODO items (with native language keywords)
 - Broken links
 - (Plural forms supported)
+
+**Native TODO Keywords:**
+- English: TODO, FIXME, BUG, HACK, NOTE, WARNING
+- Spanish: PENDIENTE, ARREGLAR, CORREGIR, NOTA, ADVERTENCIA
+- French: AFAIRE, À FAIRE, CORRIGER, RÉPARER, NOTE, ATTENTION
+- Polish: ZROBIĆ, NAPRAWIĆ, POPRAWIĆ, UWAGA, NOTATKA
 
 **Completion Items:**
 - Headings
@@ -105,6 +112,7 @@ npm run test:i18n
 # Test specific locale
 LSP_LOCALE=es-ES npm run test:completion
 LSP_LOCALE=fr-FR npm run test:completion
+LSP_LOCALE=pl-PL npm run test:completion
 ```
 
 See [`test/README.md`](./test/README.md) for complete test documentation.

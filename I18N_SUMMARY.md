@@ -14,7 +14,7 @@
 
 ### 2. Translation Files
 - **Structure:** `server/locales/{lang}/translation.json`
-- **Languages:** English (en), Spanish (es), French (fr)
+- **Languages:** English (en), Spanish (es), French (fr), Polish (pl)
 - **Content:**
   - Diagnostic messages
   - Completion item labels, details, and documentation
@@ -24,9 +24,10 @@
 ### 3. Localized Features
 
 #### Diagnostics
-- TODO items: "Found TODO item." / "Elemento TODO encontrado." / "Élément TODO trouvé."
-- Broken links: "Broken link" / "Enlace roto" / "Lien cassé"
+- TODO items: "Found TODO item." / "Elemento TODO encontrado." / "Élément TODO trouvé." / "Znaleziono element TODO."
+- Broken links: "Broken link" / "Enlace roto" / "Lien cassé" / "Uszkodzony link"
 - Plural support: "Found {{count}} TODO items."
+- **Native keywords**: TODO, PENDIENTE, À FAIRE, ZROBIĆ, FIXME, ARREGLAR, CORRIGER, NAPRAWIĆ, etc.
 
 #### Completion Items
 - Headings: "Heading" / "Encabezado" / "Titre"
@@ -109,10 +110,11 @@ All tests passing:
 
 ```
 ✓ test/stdio.test.js - Basic functionality
-✓ test/i18n.test.js - All three languages
+✓ test/i18n.test.js - All four languages
   ✓ English (en-US) - Link completion verified
   ✓ Spanish (es-ES) - Enlace completion verified
   ✓ French (fr-FR) - Lien completion verified
+  ✓ Polish (pl-PL) - Link completion verified
 ```
 
 ## 🎯 Original Requirements Met

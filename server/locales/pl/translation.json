@@ -1,0 +1,46 @@
+{
+  "diagnostics": {
+    "todo": {
+      "message": "Znaleziono element TODO.",
+      "message_plural": "Znaleziono {{count}} elementy TODO.",
+      "message_plural_2": "Znaleziono {{count}} elementów TODO."
+    },
+    "brokenLink": {
+      "message": "Uszkodzony link",
+      "message_plural": "{{count}} uszkodzone linki",
+      "message_plural_2": "{{count}} uszkodzonych linków"
+    }
+  },
+  "completion": {
+    "heading": {
+      "label": "Nagłówek",
+      "detail": "Nagłówek Markdown",
+      "documentation": "Wstaw nagłówek markdown (# do ######)"
+    },
+    "bold": {
+      "label": "Pogrubienie",
+      "detail": "Pogrubiony tekst",
+      "documentation": "Utwórz **pogrubiony** tekst"
+    },
+    "italic": {
+      "label": "Kursywa",
+      "detail": "Tekst kursywą",
+      "documentation": "Utwórz tekst *kursywą*"
+    },
+    "link": {
+      "label": "Link",
+      "detail": "Link Markdown",
+      "documentation": "Wstaw [link](url)"
+    },
+    "todo": {
+      "label": "TODO",
+      "detail": "Komentarz TODO",
+      "documentation": "Wstaw komentarz TODO"
+    }
+  },
+  "hover": {
+    "heading": "To jest nagłówek poziomu {{level}}",
+    "todo": "Element TODO - pamiętaj o ukończeniu tego zadania",
+    "link": "Link do: {{url}}"
+  }
+}
