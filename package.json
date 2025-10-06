@@ -71,6 +71,7 @@
     "watch": "tsc -b -w",
     "test": "npm run test:stdio",
     "test:stdio": "node scripts/test-stdio.js",
+    "test:quiet": "LSP_TOY_DEBUG=false node scripts/test-stdio.js",
     "build:wasm": "node scripts/build-wasm.js",
     "fetch:wasm": "node scripts/fetch-wasm.js",
     "update:wasm": "node scripts/fetch-wasm.js latest"

@@ -107,11 +107,55 @@ Use `samples/sample-resume.lsptoy` as a playground. It intentionally includes a 
 
 - `npm run compile` – build both the client and the server once.
 - `npm run watch` – rebuild on every change.
-- `npm test` – run the command-line stdio smoke test against the sample document.
+- `npm test` – run the command-line stdio smoke test with debug logging.
+- `npm run test:quiet` – run tests without debug logging (clean output).
 - `npm run fetch:wasm` – download the latest prebuilt WASM files.
 - `npm run build:wasm` – build WASM from source (requires Emscripten or Docker).
 
 The extension entry point lives in `client/src/extension.ts`. The language server logic is implemented in `server/src/server.ts`.
+
+### 🐛 Debug Mode
+
+The extension includes comprehensive debug logging for all LSP operations. Debug logging is **controlled by the `LSP_TOY_DEBUG` environment variable**.
+
+**In VS Code (F5):** Choose between two launch configurations:
+- **"Extension"** - Debug logging enabled (default)
+- **"Extension (No Debug Logs)"** - Clean output, no debug logs
+
+**In tests:**
+```bash
+npm test              # With debug logging
+npm run test:quiet    # Without debug logging
+```
+
+**Manual control:**
+```bash
+export LSP_TOY_DEBUG=true   # Enable
+export LSP_TOY_DEBUG=false  # Disable
+```
+
+When enabled, view detailed output in:
+- **Client logs**: Debug Console (Cmd+Shift+Y / Ctrl+Shift+Y)
+- **Server logs**: Output Panel → "LSP Toy Language Server" (Cmd+Shift+U / Ctrl+Shift+U)
+
+You'll see detailed information for:
+- ✓ Parser initialization and WASM loading
+- ✓ Document parsing and validation
+- ✓ Every LSP request (completions, hover, code actions, etc.)
+- ✓ Diagnostic generation with counts and details
+- ✓ Semantic token generation with statistics
+- ✓ Parse tree caching and reuse
+
+Example output:
+```
+[LSP-TOY SERVER] onCompletion called for: file:///path/to/file.lsptoy
+[LSP-TOY SERVER]   Position: line 5, char 0
+[LSP-TOY SERVER]   Trigger character: '#'
+[LSP-TOY SERVER]   → Providing section header completions
+[LSP-TOY SERVER]   ✓ Returning 4 completion items
+```
+
+See [`DEBUG.md`](./DEBUG.md) for complete debugging guide with all output examples.
 
 ## 📄 License
 

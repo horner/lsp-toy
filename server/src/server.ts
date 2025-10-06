@@ -40,13 +40,23 @@ import { Parser, Language, Tree, Node } from 'web-tree-sitter';
 
 type SyntaxNode = Node;
 
+// Debug logging control
+const DEBUG_ENABLED = process.env.LSP_TOY_DEBUG === 'true' || process.env.LSP_TOY_DEBUG === '1';
+
 // Debug logging helper - use console.error so it goes to stderr and shows up in VS Code output
 function logDebug(message: string, ...args: unknown[]): void {
-  console.error(`[LSP-TOY SERVER] ${message}`, ...args);
+  if (DEBUG_ENABLED) {
+    console.error(`[LSP-TOY SERVER] ${message}`, ...args);
+  }
 }
 
-logDebug('========================================');
-logDebug('Server module loading...');
+if (DEBUG_ENABLED) {
+  logDebug('========================================');
+  logDebug('Debug logging ENABLED');
+  logDebug('Server module loading...');
+} else {
+  console.error('[LSP-TOY SERVER] Debug logging DISABLED (set LSP_TOY_DEBUG=true to enable)');
+}
 
 let parser: Parser | null = null;
 let markdownLanguage: Language | null = null;
@@ -141,8 +151,13 @@ documents.onDidOpen(e => {
   });
 
   connection.onCodeAction((params: CodeActionParams): CodeAction[] => {
+    logDebug('onCodeAction called for:', params.textDocument.uri);
+    logDebug('  Range:', JSON.stringify(params.range));
+    logDebug('  Diagnostics count:', params.context.diagnostics.length);
+    
     const document = documents.get(params.textDocument.uri);
     if (!document) {
+      logDebug('  ✗ Document not found');
       return [];
     }
 
@@ -151,6 +166,7 @@ documents.onDidOpen(e => {
     for (const diagnostic of params.context.diagnostics) {
       const data = diagnostic.data as { kind?: string; label?: string } | undefined;
       if (data?.kind === 'todo') {
+        logDebug('  → Creating "Mark TODO as done" action');
         const edit: WorkspaceEdit = {
           changes: {
             [params.textDocument.uri]: [TextEdit.replace(diagnostic.range, 'Done')]
@@ -163,6 +179,7 @@ documents.onDidOpen(e => {
           edit
         });
       } else if (data?.kind === 'brokenLink') {
+        logDebug('  → Creating "Remove broken link" action');
         const replacement = data.label ?? '';
         const edit: WorkspaceEdit = {
           changes: {
@@ -178,12 +195,15 @@ documents.onDidOpen(e => {
       }
     }
 
+    logDebug('  ✓ Returning', actions.length, 'code actions');
     return actions;
   });
 
   connection.onCompletion((params: CompletionParams): CompletionItem[] => {
     logDebug('onCompletion called for:', params.textDocument.uri);
+    logDebug('  Position:', `line ${params.position.line}, char ${params.position.character}`);
     const trigger = params.context?.triggerCharacter;
+    logDebug('  Trigger character:', trigger ? `'${trigger}'` : 'none (manual invoke)');
     const completions: CompletionItem[] = [];
 
     const sectionHeaders = ['## Summary', '## Skills', '## Contact', '## Projects'];
@@ -206,6 +226,7 @@ documents.onDidOpen(e => {
     ];
 
     if (trigger === '#') {
+      logDebug('  → Providing section header completions');
       sectionHeaders.forEach((header, index) => {
         completions.push({
           label: header,
@@ -215,6 +236,7 @@ documents.onDidOpen(e => {
         });
       });
     } else if (trigger === '[') {
+      logDebug('  → Providing link and markdown format completions');
       completions.push(...linkSnippets);
       markdownFormats.forEach((snippet, index) => {
         completions.push({
@@ -227,6 +249,7 @@ documents.onDidOpen(e => {
     }
 
     if (!trigger) {
+      logDebug('  → Providing all default completions (no trigger)');
       sectionHeaders.forEach((header, index) => {
         completions.push({
           label: header,
@@ -248,24 +271,33 @@ documents.onDidOpen(e => {
       completions.push(...linkSnippets);
     }
 
+    logDebug('  ✓ Returning', completions.length, 'completion items');
     return completions;
   });
 
   connection.onHover((params: HoverParams) => {
+    logDebug('onHover called for:', params.textDocument.uri);
+    logDebug('  Position:', `line ${params.position.line}, char ${params.position.character}`);
+    
     const document = documents.get(params.textDocument.uri);
     if (!document) {
+      logDebug('  ✗ Document not found');
       return null;
     }
 
     const tree = getOrParseTree(document);
     if (!tree) {
+      logDebug('  ✗ Parse tree not available');
       return null;
     }
     const hoverInfo = getHoverInfo(document, params.position, tree);
 
     if (!hoverInfo) {
+      logDebug('  ⊙ No hover info available at this position');
       return null;
     }
+    
+    logDebug('  ✓ Returning hover info:', hoverInfo.substring(0, 50) + '...');
 
     return {
       contents: {
@@ -277,12 +309,19 @@ documents.onDidOpen(e => {
 
   connection.onSignatureHelp((params: SignatureHelpParams): SignatureHelp | null => {
     logDebug('onSignatureHelp called for:', params.textDocument.uri);
+    logDebug('  Position:', `line ${params.position.line}, char ${params.position.character}`);
     const document = documents.get(params.textDocument.uri);
     if (!document) {
+      logDebug('  ✗ Document not found');
       return null;
     }
 
     const signature = buildSignatureHelp(document, params.position);
+    if (signature) {
+      logDebug('  ✓ Returning signature help with', signature.signatures.length, 'signatures');
+    } else {
+      logDebug('  ⊙ No signature help available at this position');
+    }
     return signature;
   });
 
@@ -290,42 +329,57 @@ documents.onDidOpen(e => {
     logDebug('onSemanticTokens called for:', params.textDocument.uri);
     const document = documents.get(params.textDocument.uri);
     if (!document) {
+      logDebug('  ✗ Document not found');
       return { data: [] };
     }
 
     const tree = getOrParseTree(document);
     const builder = new SemanticTokensBuilder();
     if (!tree) {
+      logDebug('  ✗ Parse tree not available');
       return builder.build();
     }
     const lines = document.getText().split(/\r?\n/);
+    logDebug('  Processing', lines.length, 'lines for semantic tokens');
+    
+    const tokenCounts: Record<string, number> = {};
 
     visitTree(tree.rootNode, node => {
       switch (node.type) {
         case 'heading_content':
           pushNodeToken(builder, document, lines, node, 'heading');
+          tokenCounts['heading'] = (tokenCounts['heading'] || 0) + 1;
           break;
         case 'strong_emphasis':
           pushNodeToken(builder, document, lines, node, 'bold');
+          tokenCounts['bold'] = (tokenCounts['bold'] || 0) + 1;
           break;
         case 'emphasis':
           pushNodeToken(builder, document, lines, node, 'italic');
+          tokenCounts['italic'] = (tokenCounts['italic'] || 0) + 1;
           break;
         case 'code_span':
           pushNodeToken(builder, document, lines, node, 'code');
+          tokenCounts['code'] = (tokenCounts['code'] || 0) + 1;
           break;
         case 'link':
           pushNodeToken(builder, document, lines, node, 'link');
+          tokenCounts['link'] = (tokenCounts['link'] || 0) + 1;
           break;
         case 'text':
           highlightTodoTokens(builder, document, lines, node);
+          // Note: TODO count tracked inside highlightTodoTokens
           break;
         default:
           break;
       }
     });
 
-    return builder.build();
+    const result = builder.build();
+    const totalTokens = Object.values(tokenCounts).reduce((a, b) => a + b, 0);
+    logDebug('  ✓ Generated', totalTokens, 'semantic tokens:', JSON.stringify(tokenCounts));
+    logDebug('  Data length:', result.data.length, 'integers');
+    return result;
   });
 
   logDebug('Setting up document and connection listeners...');
@@ -436,25 +490,40 @@ function parsePort(value: string | undefined | null): number | null {
 }
 
 function validateTextDocument(document: TextDocument): void {
+  logDebug('validateTextDocument called for:', document.uri);
   const diagnostics: Diagnostic[] = [];
   const tree = parseDocument(document);
   
   if (!tree) {
+    logDebug('  ✗ Parse tree not available, sending empty diagnostics');
     connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
     return;
   }
 
+  logDebug('  Scanning tree for diagnostics...');
+  let inlineNodeCount = 0;
+  let linkNodeCount = 0;
+  
   visitTree(tree.rootNode, node => {
     // Check for TODO in inline nodes (tree-sitter-grammars uses 'inline' instead of 'text')
     if (node.type === 'inline') {
+      inlineNodeCount++;
       addTodoDiagnostics(document, node, diagnostics);
     }
 
     if (node.type === 'link') {
+      linkNodeCount++;
       addBrokenLinkDiagnostics(document, node, diagnostics);
     }
   });
 
+  logDebug('  Scanned', inlineNodeCount, 'inline nodes and', linkNodeCount, 'link nodes');
+  logDebug('  ✓ Sending', diagnostics.length, 'diagnostics');
+  if (diagnostics.length > 0) {
+    diagnostics.forEach(d => {
+      logDebug('    -', d.code, ':', d.message, 'at line', d.range.start.line);
+    });
+  }
   connection.sendDiagnostics({ uri: document.uri, diagnostics });
 }
 
@@ -607,17 +676,29 @@ function buildSignatureHelp(document: TextDocument, position: Position): Signatu
 function parseDocument(document: TextDocument): Tree | null {
   if (!parser) {
     console.error('[server] Parser not initialized');
+    logDebug('  ✗ Parser not initialized!');
     return null;
   }
-  const tree = parser.parse(document.getText());
+  const text = document.getText();
+  logDebug('  Parsing document, length:', text.length, 'chars');
+  const tree = parser.parse(text);
   if (tree) {
     documentTrees.set(document.uri, tree);
+    logDebug('  ✓ Parse successful, cached tree for', document.uri);
+  } else {
+    logDebug('  ✗ Parse failed!');
   }
   return tree;
 }
 
 function getOrParseTree(document: TextDocument): Tree | null {
-  return documentTrees.get(document.uri) ?? parseDocument(document);
+  const cached = documentTrees.get(document.uri);
+  if (cached) {
+    logDebug('  → Using cached parse tree');
+    return cached;
+  }
+  logDebug('  → No cached tree, parsing now...');
+  return parseDocument(document);
 }
 
 function visitTree(node: SyntaxNode, visitor: (node: SyntaxNode) => void): void {

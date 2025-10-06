@@ -6,6 +6,11 @@ const { URI } = require('vscode-uri');
 const path = require('node:path');
 const fs = require('node:fs');
 
+// Enable debug logging by default for tests (can override with LSP_TOY_DEBUG=false)
+if (process.env.LSP_TOY_DEBUG === undefined) {
+  process.env.LSP_TOY_DEBUG = 'true';
+}
+
 const SERVER_ENTRY = path.resolve(__dirname, '..', 'server/out/server.js');
 const SAMPLE_FILE = path.resolve(__dirname, '..', 'samples', 'sample-resume.lsptoy');
 const TEST_TIMEOUT_MS = 10000;
