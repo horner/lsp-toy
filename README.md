@@ -4,16 +4,68 @@ A VS Code LSP server that helps you author resume-style Markdown documents insid
 
 ## ✨ Features
 
-| Capability | Description | Example Behavior |
-| --- | --- | --- |
-| Diagnostics | Warns on `TODO` comments and relative links that do not resolve on disk. | Highlights `TODO` lines and `[Project](./missing.md)` as warnings. |
-| Code Actions | Offers focused quick fixes for diagnostics. | "Mark TODO as done" or "Remove broken link". |
-| Completions | Suggests resume sections and Markdown formatting as you type. | Trigger with `#` or `[` for headings, links, and formatting snippets. |
-| Hover | Displays helpful tooltips for well-known technologies and links. | Hover `Rust` to see a short description. |
-| Signature Help | Guides pseudo calls such as `contact("Jane", "Doe")`. | Shows parameter names and descriptions while typing. |
-| Semantic Tokens | Adds semantic coloring for headings, emphasis, links, code spans, and TODOs. | Headings/bold/links receive dedicated token types. |
-| Tree-sitter AST | Uses the `tree-sitter-markdown` grammar (via WASM) for parsing instead of regex heuristics. | Diagnostics and tokens stay in sync with the Markdown structure. |
-| Locale Support | Respects client locale preferences for internationalized messages. | Diagnostic messages appear in Spanish, French, etc. based on VS Code's language. |
+🔍 **Diagnostics**  
+Warns on `TODO` comments and relative links that do not resolve on disk. Highlights `TODO` lines and `[Project](./missing.md)` as warnings.
+
+⚡ **Code Actions**  
+Offers focused quick fixes for diagnostics. "Mark TODO as done" or "Remove broken link".
+
+💡 **Completions**  
+Suggests resume sections and Markdown formatting as you type. Trigger with `#` or `[` for headings, links, and formatting snippets.
+
+📖 **Hover**  
+Displays helpful tooltips for well-known technologies and links. Hover `Rust` to see a short description.
+
+✏️ **Signature Help**  
+Guides pseudo calls such as `contact("Jane", "Doe")`. Shows parameter names and descriptions while typing.
+
+🎨 **Semantic Tokens**  
+Adds semantic coloring for headings, emphasis, links, code spans, and TODOs. Headings/bold/links receive dedicated token types.
+
+🌳 **Tree-sitter AST**  
+Uses the `tree-sitter-markdown` grammar (via WASM) for parsing instead of regex heuristics. Diagnostics and tokens stay in sync with the Markdown structure.
+
+🌍 **Locale Support**  
+Respects client locale preferences for internationalized messages. Diagnostic messages appear in Spanish, French, etc. based on VS Code's language.
+
+## 🔄 LSP Architecture
+
+```mermaid
+sequenceDiagram
+    participant VSCode as VS Code
+    participant Extension as VS Code Extension
+    participant Server as LSP Server
+    participant TreeSitter as Tree-sitter
+    participant i18n as i18next
+
+    VSCode->>Extension: Open .lsptoy file
+    Extension->>Server: Initialize LSP connection
+    Server->>TreeSitter: Load WASM grammar
+    Server->>i18n: Load translations
+    Server-->>Extension: Ready
+
+    VSCode->>Extension: User types content
+    Extension->>Server: didChange notification
+    Server->>TreeSitter: Parse document
+    TreeSitter-->>Server: AST
+    Server->>Server: Generate diagnostics
+    Server->>i18n: Localize messages
+    Server-->>Extension: Publish diagnostics
+    Extension-->>VSCode: Show warnings/errors
+
+    VSCode->>Extension: Request completions
+    Extension->>Server: textDocument/completion
+    Server->>TreeSitter: Analyze context
+    Server->>i18n: Localize completion items
+    Server-->>Extension: Completion list
+    Extension-->>VSCode: Show suggestions
+
+    VSCode->>Extension: Hover request
+    Extension->>Server: textDocument/hover
+    Server->>i18n: Localize hover text
+    Server-->>Extension: Hover info
+    Extension-->>VSCode: Show tooltip
+```
 
 ## 🚀 Getting started
 
@@ -55,6 +107,8 @@ Requirements:
 - Or Docker (automatically detected by build script)
 
 **Note**: The original `ikatyang/tree-sitter-markdown` grammar cannot compile to WASM. This project uses prebuilt files from `tree-sitter-grammars/tree-sitter-markdown` which is WASM-compatible. See `GRAMMAR_NOTES.md` for details.
+
+## 🚀 Getting started
 
 ## 🚀 Getting started
 
