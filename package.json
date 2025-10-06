@@ -67,18 +67,28 @@
   },
   "scripts": {
     "compile": "tsc -b",
+    "clean": "rm -rf client/out server/out *.tsbuildinfo client/*.tsbuildinfo server/*.tsbuildinfo node_modules/.cache",
     "watch": "tsc -b -w",
-    "test": "echo \"No tests yet\""
+    "test": "npm run test:stdio",
+    "test:stdio": "node scripts/test-stdio.js",
+    "build:wasm": "node scripts/build-wasm.js",
+    "fetch:wasm": "node scripts/fetch-wasm.js",
+    "update:wasm": "node scripts/fetch-wasm.js latest"
   },
   "dependencies": {
+    "@vscode/tree-sitter-wasm": "^0.0.5-php.2",
+    "tree-sitter-wasms": "^0.1.12",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12",
-    "vscode-uri": "^3.0.8"
+    "vscode-uri": "^3.0.8",
+    "web-tree-sitter": "^0.25.10"
   },
   "devDependencies": {
     "@types/node": "^20.14.9",
     "@types/vscode": "^1.104.0",
-    "typescript": "^5.5.4"
+    "tree-sitter-cli": "^0.25.10",
+    "typescript": "^5.5.4",
+    "vscode-jsonrpc": "^8.2.1"
   }
 }

@@ -5,6 +5,9 @@ client/out/
 server/out/
 *.tsbuildinfo
 
+# Grammar sources (WASM file should be committed)
+grammars/
+
 # VS Code packaging
 *.vsix
 .vscode-test/
