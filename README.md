@@ -2,6 +2,11 @@
 
 A VS Code LSP server that helps you author resume-style Markdown documents inside `.lsptoy` files.
 
+LSP Toy VSCode extension
+
+[![Watch a Short](https://img.youtube.com/vi/mYs2Gx-8-Ok/0.jpg)](https://www.youtube.com/watch?v=mYs2Gx-8-Ok) 2:45
+
+
 ## ✨ Features
 
 🔍 **Diagnostics**  
