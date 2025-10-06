@@ -4,12 +4,7 @@ A VS Code LSP server that helps you author resume-style Markdown documents insid
 
 ## ✨ Features
 
-| Capability | Description | ExampleThe server uses **i18next** for comprehensive internationalization with JSON-based translations. It automatically detects VS Code's display language and localizes:
-
-- 📋 **Diagnostic messages** (with plural support)
-- 💡 **Completion items** (labels, details, documentation)
-- 📆 **Hover text** (with parameter interpolation)
-- 🌍 **Native TODO keywords** (PENDIENTE, À FAIRE, ZROBIĆ, etc.)vior |
+| Capability | Description | Example Behavior |
 | --- | --- | --- |
 | Diagnostics | Warns on `TODO` comments and relative links that do not resolve on disk. | Highlights `TODO` lines and `[Project](./missing.md)` as warnings. |
 | Code Actions | Offers focused quick fixes for diagnostics. | "Mark TODO as done" or "Remove broken link". |
@@ -60,6 +55,8 @@ Requirements:
 - Or Docker (automatically detected by build script)
 
 **Note**: The original `ikatyang/tree-sitter-markdown` grammar cannot compile to WASM. This project uses prebuilt files from `tree-sitter-grammars/tree-sitter-markdown` which is WASM-compatible. See `GRAMMAR_NOTES.md` for details.
+
+## 🚀 Getting started
 
 ###
 
