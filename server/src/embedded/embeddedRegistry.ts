@@ -22,6 +22,8 @@ export interface NodeImpl {
   cmd: string;
   args?: string[];
   initializationOptions?: any;
+  bundled?: boolean;  // Indicates this is a bundled server
+  fallback?: NodeImpl; // Fallback to external server if bundled fails
 }
 
 export interface LangEntry {
@@ -50,7 +52,12 @@ const DEFAULT_ENTRIES: LangEntry[] = [
     id: 'typescript',
     aliases: ['ts', 'javascript', 'js'],
     web: { workerScript: '/workers/tsWorker.js' },
-    node: { cmd: 'typescript-language-server', args: ['--stdio'] },
+    node: { 
+      cmd: './dist/bundled-servers/typescript-server.js',
+      args: ['--stdio'],
+      bundled: true,
+      fallback: { cmd: 'typescript-language-server', args: ['--stdio'] }
+    },
     capabilities: {
       completion: true,
       hover: true,
@@ -144,7 +151,12 @@ const DEFAULT_ENTRIES: LangEntry[] = [
   },
   {
     id: 'json',
-    node: { cmd: 'vscode-json-languageserver', args: ['--stdio'] },
+    node: { 
+      cmd: './dist/bundled-servers/json-server.js',
+      args: ['--stdio'],
+      bundled: true,
+      fallback: { cmd: 'vscode-json-languageserver', args: ['--stdio'] }
+    },
     capabilities: {
       completion: true,
       hover: true,

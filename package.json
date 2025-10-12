@@ -81,15 +81,20 @@
     "test:stdio": "node test/stdio.test.js",
     "test:completion": "node test/completion.test.js",
     "test:i18n": "node test/i18n.test.js",
+    "test:bundled": "node scripts/test-bundled-server.js",
+    "test:oob": "node scripts/test-out-of-box.js",
     "test:quiet": "LSP_TOY_DEBUG=false node test/stdio.test.js",
     "build:wasm": "node scripts/build-wasm.js",
     "fetch:wasm": "node scripts/fetch-wasm.js",
-    "update:wasm": "node scripts/fetch-wasm.js latest"
+    "update:wasm": "node scripts/fetch-wasm.js latest",
+    "build:bundled": "node scripts/build-bundled-servers.js",
+    "bundle:all": "npm run compile && npm run build:bundled"
   },
   "dependencies": {
     "@vscode/tree-sitter-wasm": "^0.0.5-php.2",
     "i18next": "^25.5.3",
     "tree-sitter-wasms": "^0.1.12",
+    "typescript": "^5.5.4",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
     "vscode-languageserver-textdocument": "^1.0.12",
@@ -99,8 +104,8 @@
   "devDependencies": {
     "@types/node": "^20.14.9",
     "@types/vscode": "^1.104.0",
+    "esbuild": "^0.19.12",
     "tree-sitter-cli": "^0.25.10",
-    "typescript": "^5.5.4",
     "vscode-jsonrpc": "^8.2.1"
   }
 }

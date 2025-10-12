@@ -231,30 +231,11 @@ export class EmbeddedLanguageManager {
       return null;
     }
 
-    // Spawn Node.js language server
+    // Spawn Node.js language server with fallback support
     const impl = runtime.impl as NodeImpl;
-    logDebug(`[EMBED] spawning lang=${normalizedLang} cmd=${impl.cmd}`);
-
-    let proc: ChildProcess;
-    try {
-      proc = spawn(impl.cmd, impl.args || [], {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: { ...process.env }
-      });
-    } catch (err) {
-      logDebug(`[EMBED] spawn failed lang=${normalizedLang}: ${err}`);
-      
-      // Store a dead server placeholder so getLanguageHint() can provide help
-      const deadServer: EmbeddedServer = {
-        lang: normalizedLang,
-        mode: 'node',
-        initialized: false,
-        docs: new Map(),
-        dead: true,
-        failedAt: Date.now()
-      };
-      this.servers.set(normalizedLang, deadServer);
-      
+    const proc = await this.spawnWithFallback(normalizedLang, impl);
+    
+    if (!proc) {
       return null;
     }
 
@@ -424,6 +405,77 @@ export class EmbeddedLanguageManager {
       await server.conn.sendNotification('textDocument/didChange', changeParams);
       server.docs.set(fence.virtUri, fence.version);
     }
+  }
+
+  /**
+   * Spawn language server with fallback support
+   * Try bundled server first, fallback to external if bundled fails
+   */
+  private async spawnWithFallback(normalizedLang: string, impl: NodeImpl): Promise<ChildProcess | null> {
+    const candidates = impl.fallback ? [impl, impl.fallback] : [impl];
+    
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+      const isBundled = i === 0 && impl.bundled;
+      const isLastAttempt = i === candidates.length - 1;
+      
+      logDebug(`[EMBED] attempting spawn lang=${normalizedLang} cmd=${candidate.cmd} ${isBundled ? '(bundled)' : '(external)'}`);
+
+      try {
+        // Resolve bundled server path relative to server root
+        const cmdPath = isBundled && candidate.cmd.startsWith('./') 
+          ? path.resolve(__dirname, '../../../', candidate.cmd)
+          : candidate.cmd;
+
+        const proc = spawn(cmdPath, candidate.args || [], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: { ...process.env }
+        });
+
+        // Check for immediate spawn failure
+        let spawnFailed = false;
+        proc.on('error', (err: Error) => {
+          logDebug(`[EMBED] process error lang=${normalizedLang}: ${err.message}`);
+          spawnFailed = true;
+        });
+
+        // Wait a tick to see if spawn fails immediately
+        await new Promise(resolve => setImmediate(resolve));
+        
+        if (spawnFailed || !proc.stdout || !proc.stdin) {
+          logDebug(`[EMBED] spawn failed immediately lang=${normalizedLang} cmd=${cmdPath}`);
+          proc.kill();
+          
+          if (!isLastAttempt) {
+            logDebug(`[EMBED] trying fallback for lang=${normalizedLang}`);
+            continue; // Try next candidate
+          }
+        } else {
+          logDebug(`[EMBED] spawn successful lang=${normalizedLang} cmd=${cmdPath} ${isBundled ? '(bundled)' : '(external)'}`);
+          return proc;
+        }
+      } catch (err) {
+        logDebug(`[EMBED] spawn failed lang=${normalizedLang} cmd=${candidate.cmd}: ${err}`);
+        
+        if (!isLastAttempt) {
+          logDebug(`[EMBED] trying fallback for lang=${normalizedLang}`);
+          continue; // Try next candidate
+        }
+      }
+    }
+
+    // All spawn attempts failed - store dead server placeholder
+    const deadServer: EmbeddedServer = {
+      lang: normalizedLang,
+      mode: 'node',
+      initialized: false,
+      docs: new Map(),
+      dead: true,
+      failedAt: Date.now()
+    };
+    this.servers.set(normalizedLang, deadServer);
+    
+    return null;
   }
 
   /**

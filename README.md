@@ -146,6 +146,25 @@ Requirements:
 
 **Note**: The original `ikatyang/tree-sitter-markdown` grammar cannot compile to WASM. This project uses prebuilt files from `tree-sitter-grammars/tree-sitter-markdown` which is WASM-compatible. See `GRAMMAR_NOTES.md` for details.
 
+## 📦 Language Support
+
+🚀 **TypeScript works out-of-the-box!** LSP-Toy includes a bundled TypeScript server with full completion and hover support.
+
+### Optional Additional Languages
+```bash
+# Install language servers for more languages
+npm install -g pyright                         # Python
+npm install -g bash-language-server            # Shell
+npm install -g vscode-json-languageserver      # JSON
+npm install -g yaml-language-server            # YAML
+
+# Language toolchains
+cargo install rust-analyzer                    # Rust
+go install golang.org/x/tools/gopls@latest    # Go
+```
+
+**[→ Full language support guide](scripts/README.md)**
+
 ## ✨ Features
 
 | Capability | Description | Example Behavior |
