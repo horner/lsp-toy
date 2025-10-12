@@ -113,12 +113,6 @@ Requirements:
 
 **Note**: The original `ikatyang/tree-sitter-markdown` grammar cannot compile to WASM. This project uses prebuilt files from `tree-sitter-grammars/tree-sitter-markdown` which is WASM-compatible. See `GRAMMAR_NOTES.md` for details.
 
-## 🚀 Getting started
-
-## 🚀 Getting started
-
-###
-
 ## ✨ Features
 
 | Capability | Description | Example Behavior |
