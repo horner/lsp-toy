@@ -1,6 +1,7 @@
 # lsp-toy
 
-A VS Code LSP server that helps you author resume-style Markdown documents inside `.lsptoy` files.
+🚀 **Embedded Language Support** ✨ NEW  
+Rich IDE features inside Markdown code fences! Get completions, hover info, and diagnostics for TypeScript, Python, Rust, Go, and more—all within your Markdown documents. [Learn more →](docs/features/EMBEDDED_README.md)VS Code LSP server that helps you author resume-style Markdown documents inside `.lsptoy` files.
 
 LSP Toy VSCode extension
 
@@ -283,6 +284,18 @@ npm run test:quiet    # Run tests without debug output
 
 See [`test/README.md`](./test/README.md) for complete test documentation.
 
-## 📄 License
+## � Documentation
+
+For comprehensive documentation, see the [`docs/`](./docs/) folder:
+
+- **[Documentation Hub](docs/README.md)** - Complete documentation index
+- **[Architecture Guide](docs/ARCHITECTURE.md)** - System design and components
+- **[Embedded Language Features](docs/features/EMBEDDED_PHASE1.md)** - Language server aggregation
+- **[Tree Outline Visualization](docs/features/TREE_OUTLINE_FEATURE.md)** - Document debugging tools
+- **[Development Guide](docs/development/PHASE1_COMPLETE.md)** - Implementation details
+- **[Testing Checklist](docs/development/TESTING_CHECKLIST.md)** - Manual testing procedures
+- **[Troubleshooting](docs/troubleshooting/)** - Common issues and solutions
+
+## �📄 License
 
 This project is released under the MIT License.
