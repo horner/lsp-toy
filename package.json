@@ -12,6 +12,13 @@
   ],
   "main": "./client/out/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "lsptoy.showTreeOutline",
+        "title": "LSP-Toy: Show Document Tree Outline",
+        "category": "LSP-Toy"
+      }
+    ],
     "languages": [
       {
         "id": "lsptoy",

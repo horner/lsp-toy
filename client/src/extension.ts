@@ -1,5 +1,5 @@
 import * as path from 'path';
-import { workspace, ExtensionContext, window } from 'vscode';
+import { workspace, ExtensionContext, window, commands } from 'vscode';
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -48,6 +48,20 @@ export function activate(context: ExtensionContext): void {
 
   console.log('[LSP-TOY CLIENT] LanguageClient created, starting...');
   context.subscriptions.push(client);
+  
+  // Register command before starting server (so it's only registered once)
+  const showTreeOutlineCommand = commands.registerCommand('lsptoy.showTreeOutline', () => {
+    const editor = window.activeTextEditor;
+    if (!editor || editor.document.languageId !== 'lsptoy') {
+      void window.showWarningMessage('Please open a .lsptoy file first');
+      return;
+    }
+    
+    // Note: This command is now handled by hovering on line 1
+    // The tree outline will be shown in the hover tooltip and logged to output
+    void window.showInformationMessage('Hover over line 1 to see the tree outline, or check the Output panel');
+  });
+  context.subscriptions.push(showTreeOutlineCommand);
   
   client.start().then(() => {
     console.log('[LSP-TOY CLIENT] Server started successfully!');

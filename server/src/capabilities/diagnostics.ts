@@ -16,11 +16,23 @@ export function setupDocumentHandlers(connection: Connection, documentManager: D
 
   documentManager.textDocuments.onDidChangeContent((e: TextDocumentChangeEvent<TextDocument>) => {
     logDebug('Document content changed:', e.document.uri);
+    
+    // Phase 1: Invalidate embedded fences (increment versions)
+    if (documentManager.embeddedManager) {
+      documentManager.embeddedManager.invalidateFences(e.document.uri);
+    }
+    
     validateTextDocument(e.document, connection, documentManager);
   });
 
   documentManager.textDocuments.onDidClose((event: TextDocumentChangeEvent<TextDocument>) => {
     documentManager.deleteTree(event.document.uri);
+    
+    // Phase 1: Cleanup embedded documents
+    if (documentManager.embeddedManager) {
+      documentManager.embeddedManager.closeDocument(event.document.uri);
+    }
+    
     connection.sendDiagnostics({ uri: event.document.uri, diagnostics: [] });
   });
 }
@@ -28,7 +40,7 @@ export function setupDocumentHandlers(connection: Connection, documentManager: D
 function validateTextDocument(document: TextDocument, connection: Connection, documentManager: DocumentManager): void {
   logDebug('validateTextDocument called for:', document.uri);
   const diagnostics: Diagnostic[] = [];
-  const tree = parseDocument(document, documentManager);
+  const tree = parseDocument(document, documentManager); // Tree outline disabled by default
   
   if (!tree) {
     logDebug('  ✗ Parse tree not available, sending empty diagnostics');

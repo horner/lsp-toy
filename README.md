@@ -9,7 +9,10 @@ LSP Toy VSCode extension
 
 ## ✨ Features
 
-🔍 **Diagnostics**  
+� **Embedded Language Support** ✨ NEW  
+Rich IDE features inside Markdown code fences! Get completions, hover info, and diagnostics for TypeScript, Python, Rust, Go, and more—all within your Markdown documents. [Learn more →](EMBEDDED_README.md)
+
+�🔍 **Diagnostics**  
 Warns on `TODO` comments and relative links that do not resolve on disk. Highlights `TODO` lines and `[Project](./missing.md)` as warnings.
 
 ⚡ **Code Actions**  
@@ -71,6 +74,35 @@ sequenceDiagram
     Server-->>Extension: Hover info
     Extension-->>VSCode: Show tooltip
 ```
+
+### 🔌 Embedded Language Architecture
+
+```
+┌─────────────────────────────────────────────────────┐
+│          lsp-toy Host Server (Markdown)             │
+├─────────────────────────────────────────────────────┤
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │      EmbeddedLanguageManager                │   │
+│  │  • Tree-sitter fence detection              │   │
+│  │  • Position projection                      │   │
+│  │  • Request forwarding                       │   │
+│  └─────────────────────────────────────────────┘   │
+│           ↓              ↓              ↓           │
+│  ┌──────────────┐ ┌────────────┐ ┌──────────────┐ │
+│  │ TypeScript   │ │   Python   │ │    Rust      │ │
+│  │   Server     │ │   Server   │ │   Server     │ │
+│  └──────────────┘ └────────────┘ └──────────────┘ │
+└─────────────────────────────────────────────────────┘
+```
+
+Inside Markdown code fences, lsp-toy automatically:
+1. Detects the language from fence metadata (```typescript)
+2. Spawns the appropriate language server (lazy, reused)
+3. Forwards completion/hover requests to embedded server
+4. Remaps ranges back to host document coordinates
+
+**[→ Learn more about embedded languages](EMBEDDED_README.md)**
 
 ## 🚀 Getting started
 

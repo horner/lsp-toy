@@ -1,14 +1,28 @@
 import { Connection, CompletionParams, CompletionItem, CompletionItemKind, InsertTextFormat } from 'vscode-languageserver/node';
 import { DocumentManager } from '../types';
 import { t } from '../i18n';
-import { logDebug } from '../utils/logging';
 
 export function registerCompletionProvider(connection: Connection, documentManager: DocumentManager): void {
-  connection.onCompletion((params: CompletionParams): CompletionItem[] => {
-    logDebug('onCompletion called for:', params.textDocument.uri);
-    logDebug('  Position:', `line ${params.position.line}, char ${params.position.character}`);
+  connection.onCompletion(async (params: CompletionParams): Promise<CompletionItem[]> => {
     const trigger = params.context?.triggerCharacter;
-    logDebug('  Trigger character:', trigger ? `'${trigger}'` : 'none (manual invoke)');
+
+    // Phase 1: Check if position is inside an embedded fence
+    if (documentManager.embeddedManager) {
+      const fence = documentManager.embeddedManager.findFenceAt(
+        params.textDocument.uri,
+        params.position
+      );
+
+      if (fence) {
+        const embeddedResult = await documentManager.embeddedManager.forwardCompletion(params, fence);
+        
+        if (embeddedResult) {
+          return embeddedResult;
+        }
+      }
+    }
+
+    // Host Markdown completions
     const completions: CompletionItem[] = [];
 
     const sectionHeaders = ['## Summary', '## Skills', '## Contact', '## Projects'];
@@ -33,7 +47,6 @@ export function registerCompletionProvider(connection: Connection, documentManag
     ];
 
     if (trigger === '#') {
-      logDebug('  → Providing section header completions');
       sectionHeaders.forEach((header, index) => {
         completions.push({
           label: header,
@@ -43,7 +56,6 @@ export function registerCompletionProvider(connection: Connection, documentManag
         });
       });
     } else if (trigger === '[') {
-      logDebug('  → Providing link and markdown format completions');
       completions.push(...linkSnippets);
       markdownFormats.forEach((snippet, index) => {
         completions.push({
@@ -56,7 +68,6 @@ export function registerCompletionProvider(connection: Connection, documentManag
     }
 
     if (!trigger) {
-      logDebug('  → Providing all default completions (no trigger)');
       sectionHeaders.forEach((header, index) => {
         completions.push({
           label: header,
@@ -78,7 +89,6 @@ export function registerCompletionProvider(connection: Connection, documentManag
       completions.push(...linkSnippets);
     }
 
-    logDebug('  ✓ Returning', completions.length, 'completion items');
     return completions;
   });
 }

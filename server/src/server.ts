@@ -26,6 +26,9 @@ import { registerSignatureHelpProvider } from './capabilities/signatureHelp';
 import { registerInlayHintsProvider } from './capabilities/inlayHints';
 import { registerDocumentSymbolsProvider } from './capabilities/documentSymbols';
 
+// Phase 1: Import embedded language support
+import { EmbeddedLanguageManager } from './embedded/embeddedManager';
+
 async function initializeLanguageServer(connection: any): Promise<void> {
   logDebug('initializeLanguageServer called');
   
@@ -57,6 +60,15 @@ async function initializeLanguageServer(connection: any): Promise<void> {
     if (params.clientInfo) {
       logDebug('Client info:', `${params.clientInfo.name} ${params.clientInfo.version || 'unknown version'}`);
     }
+
+    // Phase 1: Initialize embedded language manager
+    const workspaceRoot = params.workspaceFolders?.[0]?.uri.replace('file://', '') || 
+                         params.rootUri?.replace('file://', '') || 
+                         undefined;
+    
+    documentManager.embeddedManager = new EmbeddedLanguageManager(connection, workspaceRoot);
+    logDebug('[EMBED] Manager initialized, workspace:', workspaceRoot);
+    connection.console.log('[lsp-toy] Embedded language support enabled');
     
     return {
       capabilities: {
@@ -79,6 +91,7 @@ async function initializeLanguageServer(connection: any): Promise<void> {
           range: false,
           full: true
         }
+        // Note: Command handled client-side, not via executeCommandProvider
       }
     };
   });
@@ -94,6 +107,14 @@ async function initializeLanguageServer(connection: any): Promise<void> {
   registerInlayHintsProvider(connection, documentManager);
   registerDocumentSymbolsProvider(connection, documentManager);
   logDebug('All handlers registered');
+
+  // Phase 1: Register shutdown handler for embedded servers
+  connection.onShutdown(async () => {
+    logDebug('Shutdown requested');
+    if (documentManager.embeddedManager) {
+      await documentManager.embeddedManager.shutdown();
+    }
+  });
 
   logDebug('Setting up document and connection listeners...');
   documentManager.listen(connection);

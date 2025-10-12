@@ -4,6 +4,7 @@ import { Connection, TextDocuments, TextDocumentChangeEvent } from 'vscode-langu
 import { DocumentManager } from '../types';
 import { getParser } from '../parser';
 import { logDebug } from './logging';
+import { generateTreeOutline } from './tree';
 
 export function createDocumentManager(): DocumentManager & { textDocuments: TextDocuments<TextDocument> } {
   const textDocuments = new TextDocuments(TextDocument);
@@ -36,31 +37,64 @@ export function createDocumentManager(): DocumentManager & { textDocuments: Text
   };
 }
 
-export function parseDocument(document: TextDocument, documentManager: DocumentManager): Tree | null {
+export function parseDocument(document: TextDocument, documentManager: DocumentManager, showOutline: boolean = false): Tree | null {
   const parser = getParser();
   if (!parser) {
     console.error('[server] Parser not initialized');
-    logDebug('  ✗ Parser not initialized!');
     return null;
   }
   const text = document.getText();
-  logDebug('  Parsing document, length:', text.length, 'chars');
   const tree = parser.parse(text);
   if (tree) {
     documentManager.setTree(document.uri, tree);
-    logDebug('  ✓ Parse successful, cached tree for', document.uri);
-  } else {
-    logDebug('  ✗ Parse failed!');
+    
+    // Show tree outline if requested (disabled by default for performance)
+    if (showOutline) {
+      try {
+        const outline = generateTreeOutline(tree.rootNode, 3);
+        console.log('\n' + outline + '\n');
+      } catch (err) {
+        console.error('[DEBUG] Tree outline generation failed:', err);
+      }
+    }
+    
+    // Phase 1: Extract embedded fences after parsing
+    if (documentManager.embeddedManager) {
+      try {
+        documentManager.embeddedManager.extractFences(document.uri, tree, document);
+      } catch (err) {
+        logDebug('[EMBED] Fence extraction failed:', err);
+      }
+    }
   }
   return tree;
+}
+
+/**
+ * Generate and log the tree outline for a document (for debugging purposes)
+ */
+export function showDocumentOutline(document: TextDocument, documentManager: DocumentManager): void {
+  const tree = getOrParseTree(document, documentManager);
+  if (!tree) {
+    console.log('[DEBUG] No tree available for document:', document.uri);
+    return;
+  }
+  
+  try {
+    const outline = generateTreeOutline(tree.rootNode, 3);
+    console.log('\n=== Document Tree Outline ===');
+    console.log('URI:', document.uri);
+    console.log(outline);
+    console.log('=============================\n');
+  } catch (err) {
+    console.error('[DEBUG] Failed to generate tree outline:', err);
+  }
 }
 
 export function getOrParseTree(document: TextDocument, documentManager: DocumentManager): Tree | null {
   const cached = documentManager.getTree(document.uri);
   if (cached) {
-    logDebug('  → Using cached parse tree');
     return cached;
   }
-  logDebug('  → No cached tree, parsing now...');
   return parseDocument(document, documentManager);
 }
