@@ -90,7 +90,7 @@
     "update:wasm": "node scripts/fetch-wasm.js latest",
     "build:bundled": "node scripts/build-bundled-servers.js",
     "bundle:all": "npm run compile && npm run build:bundled",
-    "start:ws-server": "node server/out/serverBrowser.js",
+    "start:ws-server": "LSP_PORT=8080 node server/out/server.js",
     "start:wss-server": "node server/out/serverSecure.js"
   },
   "dependencies": {
