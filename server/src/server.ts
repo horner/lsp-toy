@@ -1,139 +1,78 @@
 import * as net from 'net';
+import { WebSocketServer, WebSocket } from 'ws';
+import { Duplex } from 'stream';
 import {
   createConnection,
   ProposedFeatures,
-  InitializeParams,
-  InitializeResult,
-  TextDocumentSyncKind,
   SocketMessageReader,
-  SocketMessageWriter
+  SocketMessageWriter,
+  StreamMessageReader,
+  StreamMessageWriter
 } from 'vscode-languageserver/node';
 
 // Import core modules
-import { initializeParser, semanticLegend } from './parser';
-import { initializeI18n } from './i18n';
-import { createDocumentManager } from './utils/document';
-import { logDebug, isDebugEnabled } from './utils/logging';
+import { logDebug } from './utils/logging';
 import { resolvePort } from './utils/network';
+import { initializeLanguageServer } from './initialization';
+import type { MessageReader, MessageWriter } from 'vscode-languageserver/node';
 
-// Import capability handlers
-import { setupDocumentHandlers } from './capabilities/diagnostics';
-import { registerCompletionProvider } from './capabilities/completion';
-import { registerHoverProvider } from './capabilities/hover';
-import { registerCodeActionProvider } from './capabilities/codeAction';
-import { registerSemanticTokensProvider } from './capabilities/semanticTokens';
-import { registerSignatureHelpProvider } from './capabilities/signatureHelp';
-import { registerInlayHintsProvider } from './capabilities/inlayHints';
-import { registerDocumentSymbolsProvider } from './capabilities/documentSymbols';
-
-// Phase 1: Import embedded language support
-import { EmbeddedLanguageManager } from './embedded/embeddedManager';
-
-async function initializeLanguageServer(connection: any): Promise<void> {
-  logDebug('initializeLanguageServer called');
+// Helper to add JSON-RPC logging to any reader/writer pair
+function addMessageLogging(reader: MessageReader, writer: MessageWriter, label: string) {
+  const originalListen = reader.listen.bind(reader);
+  reader.listen = (callback) => {
+    return originalListen((msg) => {
+      logDebug(`[${label} ← CLIENT] ${JSON.stringify(msg)}`);
+      callback(msg);
+    });
+  };
   
-  const documentManager = createDocumentManager();
-  logDebug('DocumentManager created');
+  const originalWrite = writer.write.bind(writer);
+  writer.write = (msg) => {
+    logDebug(`[${label} → SERVER] ${JSON.stringify(msg)}`);
+    return originalWrite(msg);
+  };
+}
 
-  // Initialize parser before handling requests
-  logDebug('About to initialize parser...');
-  await initializeParser();
-  
-  // Safe console logging that won't crash if connection closes
-  try {
-    connection.console.log('Parser initialized successfully');
-  } catch (error) {
-    logDebug('Failed to send console message (connection may be closed):', error);
+// WebSocket to Stream adapter
+class WebSocketDuplex extends Duplex {
+  private ws: WebSocket;
+
+  constructor(ws: WebSocket) {
+    super();
+    this.ws = ws;
+    
+    ws.on('message', (data: Buffer | string) => {
+      const buffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
+      this.push(buffer);
+    });
+
+    ws.on('close', () => {
+      this.push(null);
+    });
+
+    ws.on('error', (error) => {
+      this.destroy(error);
+    });
   }
-  logDebug('Parser initialized!');
 
-  connection.onInitialize(async (params: InitializeParams): Promise<InitializeResult> => {
-    logDebug('onInitialize handler called');
-    
-    // Capture client locale preferences
-    const clientLocale = params.locale;
-    if (clientLocale) {
-      logDebug('Client locale:', clientLocale);
-      try {
-        connection.console.log(`Client locale: ${clientLocale}`);
-      } catch (error) {
-        logDebug('Failed to send console message (connection may be closed)');
-      }
+  _read(_size: number): void {
+    // No-op: data is pushed when received
+  }
+
+  _write(chunk: any, _encoding: string, callback: (error?: Error | null) => void): void {
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(chunk, (error) => {
+        callback(error || null);
+      });
     } else {
-      logDebug('No locale information provided by client');
+      callback(new Error('WebSocket is not open'));
     }
-    
-    // Initialize i18n with the client's locale
-    await initializeI18n(clientLocale);
-    
-    // Log other useful client info
-    if (params.clientInfo) {
-      logDebug('Client info:', `${params.clientInfo.name} ${params.clientInfo.version || 'unknown version'}`);
-    }
+  }
 
-    // Phase 1: Initialize embedded language manager
-    const workspaceRoot = params.workspaceFolders?.[0]?.uri.replace('file://', '') || 
-                         params.rootUri?.replace('file://', '') || 
-                         undefined;
-    
-    documentManager.embeddedManager = new EmbeddedLanguageManager(connection, workspaceRoot);
-    logDebug('[EMBED] Manager initialized, workspace:', workspaceRoot);
-    try {
-      connection.console.log('[lsp-toy] Embedded language support enabled');
-    } catch (error) {
-      logDebug('Failed to send console message (connection may be closed)');
-    }
-    
-    return {
-      capabilities: {
-        textDocumentSync: TextDocumentSyncKind.Incremental,
-        completionProvider: {
-          resolveProvider: true,
-          triggerCharacters: [' ', '.', '-', '#', '[']
-        },
-        hoverProvider: true,
-        codeActionProvider: {
-          resolveProvider: false
-        },
-        inlayHintProvider: true,
-        documentSymbolProvider: true,
-        signatureHelpProvider: {
-          triggerCharacters: ['(', ',']
-        },
-        semanticTokensProvider: {
-          legend: semanticLegend,
-          range: false,
-          full: true
-        }
-        // Note: Command handled client-side, not via executeCommandProvider
-      }
-    };
-  });
-
-  // Register all capability handlers
-  logDebug('Registering capability handlers...');
-  setupDocumentHandlers(connection, documentManager);
-  registerCompletionProvider(connection, documentManager);
-  registerHoverProvider(connection, documentManager);
-  registerCodeActionProvider(connection, documentManager);
-  registerSemanticTokensProvider(connection, documentManager);
-  registerSignatureHelpProvider(connection, documentManager);
-  registerInlayHintsProvider(connection, documentManager);
-  registerDocumentSymbolsProvider(connection, documentManager);
-  logDebug('All handlers registered');
-
-  // Phase 1: Register shutdown handler for embedded servers
-  connection.onShutdown(async () => {
-    logDebug('Shutdown requested');
-    if (documentManager.embeddedManager) {
-      await documentManager.embeddedManager.shutdown();
-    }
-  });
-
-  logDebug('Setting up document and connection listeners...');
-  documentManager.listen(connection);
-  connection.listen();
-  logDebug('Listeners setup complete - server is ready!');
+  _final(callback: (error?: Error | null) => void): void {
+    this.ws.close();
+    callback();
+  }
 }
 
 // Main entry point
@@ -142,51 +81,67 @@ const requestedPort = resolvePort();
 logDebug('Port resolution result:', requestedPort);
 
 if (requestedPort !== null) {
-  logDebug('Starting TCP server on port:', requestedPort);
-  let activeSocket: net.Socket | null = null;
-  const server = net.createServer(socket => {
-    logDebug('TCP connection received');
-    if (activeSocket) {
-      logDebug('Closing previous active socket');
-      activeSocket.end();
-      activeSocket = null;
-    }
+  // WebSocket mode - for browser-based VS Code over network
+  logDebug('Starting WebSocket server on port:', requestedPort);
+  
+  let clientCounter = 0;
+  const wss = new WebSocketServer({ port: requestedPort });
 
-    logDebug('Accepting TCP connection');
-    activeSocket = socket;
-    const socketConnection = createConnection(
-      ProposedFeatures.all,
-      new SocketMessageReader(socket),
-      new SocketMessageWriter(socket)
-    );
+  wss.on('connection', (ws: WebSocket) => {
+    const clientId = `WS-${++clientCounter}`;
+    logDebug(`${clientId} connected via WebSocket`);
 
-    socket.on('close', () => {
-      logDebug('Socket connection closed');
-      activeSocket = null;
+    const stream = new WebSocketDuplex(ws);
+    
+    const reader = new StreamMessageReader(stream);
+    const writer = new StreamMessageWriter(stream);
+    addMessageLogging(reader, writer, clientId);
+    
+    const connection = createConnection(ProposedFeatures.all, reader, writer);
+
+    logDebug(`${clientId} LSP connection created, waiting for initialize request...`);
+
+    ws.on('close', () => {
+      logDebug(`${clientId} disconnected`);
     });
 
-    socket.on('error', (error) => {
-      logDebug('Socket error:', error.message);
-      activeSocket = null;
+    ws.on('error', (error) => {
+      logDebug(`${clientId} error:`, error.message);
     });
 
-    initializeLanguageServer(socketConnection).catch(error => {
-      logDebug('Error initializing language server:', error);
+    initializeLanguageServer(connection).catch(error => {
+      logDebug(`${clientId} initialization error:`, error);
     });
   });
 
-  server.listen(requestedPort, () => {
-    console.log(`[lsp-toy] Listening on port ${requestedPort}`);
+  wss.on('error', (error) => {
+    logDebug('WebSocket server error:', error);
   });
 
-  server.on('error', error => {
-    console.error('[lsp-toy] TCP server error', error);
-  });
+  logDebug(`WebSocket server listening on ws://localhost:${requestedPort}`);
+
+  // Graceful shutdown
+  const shutdown = () => {
+    logDebug('Shutting down WebSocket server...');
+    wss.close(() => {
+      logDebug('WebSocket server closed');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', shutdown);
+  process.on('SIGINT', shutdown);
 } else {
   logDebug('No port specified - using stdio mode');
   logDebug('Creating connection with stdin/stdout...');
-  const stdioConnection = createConnection(ProposedFeatures.all, process.stdin, process.stdout);
-  logDebug('stdio connection created, initializing language server...');
+  
+  const reader = new StreamMessageReader(process.stdin);
+  const writer = new StreamMessageWriter(process.stdout);
+  addMessageLogging(reader, writer, 'STDIO');
+  
+  const stdioConnection = createConnection(ProposedFeatures.all, reader, writer);
+  
+  logDebug('stdio connection created with logging, initializing language server...');
   initializeLanguageServer(stdioConnection);
   logDebug('Language server initialization started (async)');
 }

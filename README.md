@@ -113,6 +113,32 @@ npm run fetch:wasm   # Download prebuilt WASM files
 npm run compile
 ```
 
+### Running Modes
+
+lsp-toy supports multiple deployment modes:
+
+#### 1. Desktop Mode (Default - stdio)
+Standard VS Code extension using stdio transport:
+```bash
+npm run compile
+# Extension automatically starts when opening .lsptoy files
+```
+
+#### 2. WebSocket Mode (Browser Support)
+For browser-based VS Code (vscode.dev, github.dev):
+```bash
+npm run compile
+npm run start:ws-server  # Starts WebSocket server on port 8080
+```
+
+Configure the WebSocket URL in VS Code settings:
+```json
+{
+  "lsptoy.websocketUrl": "ws://localhost:8080"
+}
+```
+
+
 ### WASM Grammar Files
 
 The language server uses `tree-sitter-markdown` compiled to WebAssembly for cross-platform parsing. **Prebuilt WASM files are included**, so you don't need to compile anything!
