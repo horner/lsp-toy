@@ -38,7 +38,13 @@ async function initializeLanguageServer(connection: any): Promise<void> {
   // Initialize parser before handling requests
   logDebug('About to initialize parser...');
   await initializeParser();
-  connection.console.log('Parser initialized successfully');
+  
+  // Safe console logging that won't crash if connection closes
+  try {
+    connection.console.log('Parser initialized successfully');
+  } catch (error) {
+    logDebug('Failed to send console message (connection may be closed):', error);
+  }
   logDebug('Parser initialized!');
 
   connection.onInitialize(async (params: InitializeParams): Promise<InitializeResult> => {
@@ -48,7 +54,11 @@ async function initializeLanguageServer(connection: any): Promise<void> {
     const clientLocale = params.locale;
     if (clientLocale) {
       logDebug('Client locale:', clientLocale);
-      connection.console.log(`Client locale: ${clientLocale}`);
+      try {
+        connection.console.log(`Client locale: ${clientLocale}`);
+      } catch (error) {
+        logDebug('Failed to send console message (connection may be closed)');
+      }
     } else {
       logDebug('No locale information provided by client');
     }
@@ -68,7 +78,11 @@ async function initializeLanguageServer(connection: any): Promise<void> {
     
     documentManager.embeddedManager = new EmbeddedLanguageManager(connection, workspaceRoot);
     logDebug('[EMBED] Manager initialized, workspace:', workspaceRoot);
-    connection.console.log('[lsp-toy] Embedded language support enabled');
+    try {
+      connection.console.log('[lsp-toy] Embedded language support enabled');
+    } catch (error) {
+      logDebug('Failed to send console message (connection may be closed)');
+    }
     
     return {
       capabilities: {
@@ -151,7 +165,14 @@ if (requestedPort !== null) {
       activeSocket = null;
     });
 
-    initializeLanguageServer(socketConnection);
+    socket.on('error', (error) => {
+      logDebug('Socket error:', error.message);
+      activeSocket = null;
+    });
+
+    initializeLanguageServer(socketConnection).catch(error => {
+      logDebug('Error initializing language server:', error);
+    });
   });
 
   server.listen(requestedPort, () => {
