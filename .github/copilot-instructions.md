@@ -82,6 +82,15 @@
 - Use clear cross-references between related documentation files
 - Update the main architecture document when workflow structure changes
 
+## Testing LSP-Toy
+
+### Monaco Editor Testing
+- **Use start.sh**: Always test the Monaco web editor using `LSP_TOY_DEBUG=true ./start.sh` from the project root
+- **Automatic build**: The start.sh script automatically builds both the server and the Monaco client before starting
+- **No manual build needed**: Do NOT run `cd web-client/monaco-editor && npm run build` separately
+- **Test URL**: After starting, test at http://localhost:8080/editor
+- **Debug output**: The LSP_TOY_DEBUG=true flag enables detailed server logging for troubleshooting
+
 ## Working with GitHub Actions Workflows
 
 ### Development Philosophy
