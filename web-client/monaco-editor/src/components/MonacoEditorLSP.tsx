@@ -1,8 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Editor from '@monaco-editor/react';
 import * as monaco from 'monaco-editor';
+import { SAMPLE_LSPTOY_CONTENT } from '../constants/sampleContent';
 
-const LSP_WS_URL = 'ws://localhost:8080';
+const getLSPWebSocketUrl = (): string => {
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const host = window.location.host;
+  return `${protocol}//${host}`;
+};
 
 interface LSPMessage {
   jsonrpc: '2.0';
@@ -45,7 +50,7 @@ export const MonacoEditorLSP: React.FC = () => {
     setConnectionError(null);
     
     try {
-      const webSocket = new WebSocket(LSP_WS_URL);
+      const webSocket = new WebSocket(getLSPWebSocketUrl());
       wsRef.current = webSocket;
       
       webSocket.onopen = () => {
@@ -200,9 +205,17 @@ export const MonacoEditorLSP: React.FC = () => {
       {/* Header */}
       <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">LSP Toy Monaco Editor</h1>
-            <p className="text-sm text-gray-400 mt-1">WebSocket LSP Client</p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h1 className="text-2xl font-bold text-white">LSP Toy Monaco Editor</h1>
+              <p className="text-sm text-gray-400 mt-1">WebSocket LSP Client</p>
+            </div>
+            <a
+              href="/"
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              ← Home
+            </a>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -244,7 +257,7 @@ export const MonacoEditorLSP: React.FC = () => {
         <Editor
           height="100%"
           defaultLanguage="lsptoy"
-          defaultValue="# Welcome to LSP Toy Editor\n\nStart typing to see LSP features in action!\n"
+          defaultValue={SAMPLE_LSPTOY_CONTENT}
           theme="vs-dark"
           onMount={handleEditorDidMount}
           options={{
