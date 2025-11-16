@@ -20,6 +20,7 @@ import type { MessageReader, MessageWriter } from 'vscode-languageserver/node';
 function addMessageLogging(reader: MessageReader, writer: MessageWriter, label: string) {
   const originalListen = reader.listen.bind(reader);
   reader.listen = (callback) => {
+    logDebug(`[${label}] Reader.listen() called, wrapping callback`);
     return originalListen((msg) => {
       logDebug(`[${label} ← CLIENT] ${JSON.stringify(msg)}`);
       callback(msg);
@@ -28,14 +29,16 @@ function addMessageLogging(reader: MessageReader, writer: MessageWriter, label: 
   
   const originalWrite = writer.write.bind(writer);
   writer.write = (msg) => {
-    logDebug(`[${label} → SERVER] ${JSON.stringify(msg)}`);
+    logDebug(`[${label} → CLIENT] ${JSON.stringify(msg)}`);
     return originalWrite(msg);
   };
 }
 
-// WebSocket to Stream adapter
+// WebSocket to Stream adapter with configurable message format
 class WebSocketDuplex extends Duplex {
   private ws: WebSocket;
+  private mode: 'lsp-protocol' | 'raw-jsonrpc' = 'lsp-protocol';
+  private firstResponse: boolean = true;
 
   constructor(ws: WebSocket) {
     super();
@@ -43,7 +46,21 @@ class WebSocketDuplex extends Duplex {
     
     ws.on('message', (data: Buffer | string) => {
       const buffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
-      this.push(buffer);
+      const text = buffer.toString('utf-8');
+      
+      logDebug(`[WebSocket] Received ${buffer.length} bytes from client (${this.mode})`);
+      
+      if (this.mode === 'raw-jsonrpc') {
+        // Wrap raw JSON-RPC in LSP protocol headers for StreamMessageReader
+        const contentLength = Buffer.byteLength(text, 'utf-8');
+        const wrapped = `Content-Length: ${contentLength}\r\n\r\n${text}`;
+        logDebug(`[WebSocket] Wrapping: ${text.substring(0, 100)}`);
+        this.push(Buffer.from(wrapped, 'utf-8'));
+      } else {
+        // LSP protocol mode - pass through as-is
+        logDebug(`[WebSocket] Pass-through: ${text.substring(0, 100)}`);
+        this.push(buffer);
+      }
     });
 
     ws.on('close', () => {
@@ -60,18 +77,108 @@ class WebSocketDuplex extends Duplex {
   }
 
   _write(chunk: any, _encoding: string, callback: (error?: Error | null) => void): void {
-    if (this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(chunk, (error) => {
-        callback(error || null);
-      });
+    const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+
+
+    logDebug(`[WebSocket] WRITE: ${buffer.length} bytes (${this.mode}), this: ${this.firstResponse ? 'first response' : 'subsequent response'}  `);
+    
+    if (this.mode === 'raw-jsonrpc') {
+      // Strip LSP headers and send only JSON body
+      const text = buffer.toString('utf-8');
+      const headerEnd = text.indexOf('\r\n\r\n');
+      
+      if (headerEnd !== -1) {
+        const jsonBody = text.substring(headerEnd + 4);
+        
+        if (jsonBody.length === 0) {
+          // This is just the headers chunk from StreamMessageWriter's first write
+          // Skip it - we'll send when we get the body chunk
+          logDebug(`[WebSocket] Skipping headers-only chunk in raw-jsonrpc mode`);
+          callback();
+          return;
+        }
+        
+        // For the first response in awesome mode, send with Content-Length header
+        if (this.firstResponse) {
+          this.firstResponse = false;
+          const contentLength = Buffer.byteLength(jsonBody, 'utf-8');
+          const messageWithHeader = `Content-Length: ${contentLength}\r\n\r\n${jsonBody}`;
+          logDebug(`[WebSocket] Sending FIRST response with header (${messageWithHeader.length} bytes): ${jsonBody.substring(0, 100)}`);
+          
+          if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(messageWithHeader, (error) => {
+              callback(error || null);
+            });
+          } else {
+            callback(new Error('WebSocket is not open'));
+          }
+        } else {
+          // Subsequent responses - send only JSON
+          logDebug(`[WebSocket] Sending JSON (${jsonBody.length} bytes): ${jsonBody.substring(0, 100)}`);
+          
+          if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(jsonBody, (error) => {
+              callback(error || null);
+            });
+          } else {
+            callback(new Error('WebSocket is not open'));
+          }
+        }
+      } else {
+        // No headers found - this is the body-only chunk from StreamMessageWriter's second write
+        if (text.trim().length === 0) {
+          logDebug(`[WebSocket] Skipping empty chunk`);
+          callback();
+          return;
+        }
+        
+        // For the first response in awesome mode, send with Content-Length header
+        if (this.firstResponse) {
+          this.firstResponse = false;
+          const contentLength = Buffer.byteLength(text, 'utf-8');
+          const messageWithHeader = `Content-Length: ${contentLength}\r\n\r\n${text}`;
+          logDebug(`[WebSocket] Sending FIRST response with header (${messageWithHeader.length} bytes): ${text.substring(0, 100)}`);
+          
+          if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(messageWithHeader, (error) => {
+              callback(error || null);
+            });
+          } else {
+            callback(new Error('WebSocket is not open'));
+          }
+        } else {
+          // Subsequent responses - send only JSON
+          logDebug(`[WebSocket] Sending body-only chunk (${text.length} bytes): ${text.substring(0, 100)}`);
+          if (this.ws.readyState === WebSocket.OPEN) {
+            this.ws.send(text, (error) => {
+              callback(error || null);
+            });
+          } else {
+            callback(new Error('WebSocket is not open'));
+          }
+        }
+      }
     } else {
-      callback(new Error('WebSocket is not open'));
+      // LSP protocol mode - send with headers
+      logDebug(`[WebSocket] Sending with headers (${buffer.length} bytes)`);
+      if (this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(buffer, (error) => {
+          callback(error || null);
+        });
+      } else {
+        callback(new Error('WebSocket is not open'));
+      }
     }
   }
 
   _final(callback: (error?: Error | null) => void): void {
     this.ws.close();
     callback();
+  }
+
+  setMode(mode: 'lsp-protocol' | 'raw-jsonrpc'): void {
+    this.mode = mode;
+    logDebug(`[WebSocket] Mode set to: ${mode}`);
   }
 }
 
@@ -109,9 +216,15 @@ if (requestedPort !== null) {
       logDebug(`${clientId} error:`, error.message);
     });
 
-    initializeLanguageServer(connection).catch(error => {
+    // Initialize and start listening immediately
+    initializeLanguageServer(connection, stream).catch(error => {
       logDebug(`${clientId} initialization error:`, error);
     });
+    
+    // Start listening for messages right away
+    logDebug(`${clientId} Starting connection.listen()...`);
+    connection.listen();
+    logDebug(`${clientId} connection.listen() started`);
   });
 
   wss.on('error', (error) => {
@@ -120,13 +233,27 @@ if (requestedPort !== null) {
 
   logDebug(`WebSocket server listening on ws://localhost:${requestedPort}`);
 
-  // Graceful shutdown
+  // Graceful shutdown with double Ctrl-C to force quit
+  let shutdownRequested = false;
   const shutdown = () => {
-    logDebug('Shutting down WebSocket server...');
+    if (shutdownRequested) {
+      logDebug('Force shutdown - exiting immediately');
+      process.exit(1);
+    }
+    
+    shutdownRequested = true;
+    logDebug('Shutting down WebSocket server... (press Ctrl-C again to force quit)');
+    
     wss.close(() => {
       logDebug('WebSocket server closed');
       process.exit(0);
     });
+    
+    // If graceful shutdown takes too long, force exit after 2 seconds
+    setTimeout(() => {
+      logDebug('Shutdown timeout - forcing exit');
+      process.exit(1);
+    }, 2000);
   };
 
   process.on('SIGTERM', shutdown);

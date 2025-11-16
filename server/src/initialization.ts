@@ -23,26 +23,39 @@ import { registerDocumentSymbolsProvider } from './capabilities/documentSymbols'
 // Phase 1: Import embedded language support
 import { EmbeddedLanguageManager } from './embedded/embeddedManager';
 
-export async function initializeLanguageServer(connection: any): Promise<void> {
+export async function initializeLanguageServer(connection: any, stream?: any): Promise<void> {
   logDebug('initializeLanguageServer called');
   
   const documentManager = createDocumentManager();
   logDebug('DocumentManager created');
 
-  // Initialize parser before handling requests
-  logDebug('About to initialize parser...');
-  await initializeParser();
-  
-  // Safe console logging that won't crash if connection closes
-  try {
-    connection.console.log('Parser initialized successfully');
-  } catch (error) {
-    logDebug('Failed to send console message (connection may be closed):', error);
-  }
-  logDebug('Parser initialized!');
-
+  // Register onInitialize handler FIRST before any async work
   connection.onInitialize(async (params: InitializeParams): Promise<InitializeResult> => {
     logDebug('onInitialize handler called');
+    logDebug(`Initialize params: ${JSON.stringify(params)}`);
+    
+    // Check for custom transport property in clientInfo
+    // @ts-ignore - custom extension to LSP protocol
+    const rpcHeader = params.clientInfo?.transport?.['rpc-header'];
+    if (rpcHeader === false && stream?.setMode) {
+      stream.setMode('raw-jsonrpc');
+      logDebug('Client requested awesome mode (raw JSON-RPC without headers)');
+    } else if (stream?.setMode) {
+      stream.setMode('lsp-protocol');
+      logDebug('Using standard LSP protocol mode (with Content-Length headers)');
+    }
+    
+    // Initialize parser on first initialize request
+    logDebug('About to initialize parser...');
+    await initializeParser();
+    
+    // Safe console logging that won't crash if connection closes
+    try {
+      connection.console.log('Parser initialized successfully');
+    } catch (error) {
+      logDebug('Failed to send console message (connection may be closed):', error);
+    }
+    logDebug('Parser initialized!');
     
     // Capture client locale preferences
     const clientLocale = params.locale;
@@ -78,7 +91,7 @@ export async function initializeLanguageServer(connection: any): Promise<void> {
       logDebug('Failed to send console message (connection may be closed)');
     }
     
-    return {
+    const result: InitializeResult = {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
         completionProvider: {
@@ -102,6 +115,9 @@ export async function initializeLanguageServer(connection: any): Promise<void> {
         // Note: Command handled client-side, not via executeCommandProvider
       }
     };
+    
+    logDebug(`Returning initialize result: ${JSON.stringify(result)}`);
+    return result;
   });
 
   // Register all capability handlers
@@ -126,6 +142,6 @@ export async function initializeLanguageServer(connection: any): Promise<void> {
 
   logDebug('Setting up document and connection listeners...');
   documentManager.listen(connection);
-  connection.listen();
+  // Note: connection.listen() is now called in server.ts immediately after connection creation
   logDebug('Listeners setup complete - server is ready!');
 }
