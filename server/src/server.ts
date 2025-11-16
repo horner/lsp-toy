@@ -1,4 +1,5 @@
 import * as net from 'net';
+import * as http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { Duplex } from 'stream';
 import {
@@ -192,9 +193,84 @@ if (requestedPort !== null) {
   logDebug('Starting WebSocket server on port:', requestedPort);
   
   let clientCounter = 0;
-  const wss = new WebSocketServer({ port: requestedPort });
+  
+  // Create HTTP server to handle both HTTP and WebSocket requests
+  const httpServer = http.createServer((req, res) => {
+    logDebug(`HTTP request from ${req.socket.remoteAddress}: ${req.method} ${req.url}`);
+    
+    // Serve informational page for HTTP requests
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LSP-Toy Language Server</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 800px;
+      margin: 60px auto;
+      padding: 0 20px;
+      line-height: 1.6;
+      color: #333;
+    }
+    h1 { color: #0066cc; border-bottom: 2px solid #0066cc; padding-bottom: 10px; }
+    .info-box {
+      background: #f5f5f5;
+      border-left: 4px solid #0066cc;
+      padding: 15px 20px;
+      margin: 20px 0;
+    }
+    code {
+      background: #e8e8e8;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+    }
+    a { color: #0066cc; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .port { font-weight: bold; color: #0066cc; }
+  </style>
+</head>
+<body>
+  <h1>🔌 LSP-Toy Language Server</h1>
+  
+  <div class="info-box">
+    <p><strong>WebSocket Server Running</strong></p>
+    <p>Port: <span class="port">${requestedPort}</span></p>
+  </div>
+  
+  <h2>About</h2>
+  <p>This is a Language Server Protocol (LSP) implementation for the LSP-Toy language. 
+     The server communicates via WebSocket and is designed to work with VS Code and other LSP-compatible editors.</p>
+  
+  <h2>Setup</h2>
+  <p>To use this language server:</p>
+  <ol>
+    <li>Install the LSP-Toy extension in VS Code</li>
+    <li>The extension will automatically connect to this WebSocket server</li>
+    <li>Open any <code>.lsptoy</code> file to activate language features</li>
+  </ol>
+  
+  <h2>Documentation</h2>
+  <p>For more information, setup instructions, and documentation:</p>
+  <p>📚 <a href="https://github.com/horner/lsp-toy" target="_blank">https://github.com/horner/lsp-toy</a></p>
+  
+  <hr style="margin: 40px 0; border: none; border-top: 1px solid #ddd;">
+  <p style="color: #666; font-size: 14px;">
+    💡 <em>This page is shown because you accessed the WebSocket port via HTTP. 
+    Language server clients should connect using the WebSocket protocol (ws://).</em>
+  </p>
+</body>
+</html>`);
+  });
 
-  wss.on('connection', (ws: WebSocket) => {
+  const wss = new WebSocketServer({ 
+    server: httpServer
+  });
+
+  wss.on('connection', (ws: WebSocket, request) => {
     const clientId = `WS-${++clientCounter}`;
     logDebug(`${clientId} connected via WebSocket`);
 
@@ -231,7 +307,12 @@ if (requestedPort !== null) {
     logDebug('WebSocket server error:', error);
   });
 
-  logDebug(`WebSocket server listening on ws://localhost:${requestedPort}`);
+  // Start the HTTP server
+  httpServer.listen(requestedPort, () => {
+    logDebug(`HTTP/WebSocket server listening on port ${requestedPort}`);
+    logDebug(`- WebSocket: ws://localhost:${requestedPort}`);
+    logDebug(`- HTTP Info Page: http://localhost:${requestedPort}`);
+  });
 
   // Graceful shutdown with double Ctrl-C to force quit
   let shutdownRequested = false;
@@ -242,11 +323,13 @@ if (requestedPort !== null) {
     }
     
     shutdownRequested = true;
-    logDebug('Shutting down WebSocket server... (press Ctrl-C again to force quit)');
+    logDebug('Shutting down HTTP/WebSocket server... (press Ctrl-C again to force quit)');
     
     wss.close(() => {
-      logDebug('WebSocket server closed');
-      process.exit(0);
+      httpServer.close(() => {
+        logDebug('HTTP/WebSocket server closed');
+        process.exit(0);
+      });
     });
     
     // If graceful shutdown takes too long, force exit after 2 seconds

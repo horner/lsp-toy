@@ -138,6 +138,9 @@ Configure the WebSocket URL in VS Code settings:
 }
 ```
 
+> **💡 HTTP Information Page**: If you access the WebSocket port via HTTP (e.g., `http://localhost:8080` in a browser), you'll see a helpful information page with setup instructions and a link to this repository. This is useful for debugging and verifying the server is running.
+> 
+
 
 ### WASM Grammar Files
 
