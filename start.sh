@@ -4,13 +4,19 @@ set -e
 echo "🚀 Building LSP-Toy Server..."
 echo ""
 
+# Install dependencies for main project
+echo "📦 Installing main project dependencies..."
+npm install
+
 # Build TypeScript server
 echo "📦 Compiling TypeScript..."
 npm run compile
 
-# Build Monaco web client
-echo "🌐 Building Monaco editor web client..."
+# Install dependencies and build Monaco web client
+echo "🌐 Installing Monaco editor dependencies..."
 cd web-client/monaco-editor
+npm install
+echo "🌐 Building Monaco editor web client..."
 npm run build
 cd ../..
 
