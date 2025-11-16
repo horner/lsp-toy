@@ -66,7 +66,10 @@ export const MonacoEditorLSP: React.FC = () => {
             processId: null,
             clientInfo: {
               name: 'Monaco LSP Toy Client',
-              version: '1.0.0'
+              version: '1.0.0',
+              transport: {
+                'rpc-header': false
+              },            
             },
             rootUri: null,
             capabilities: {
@@ -96,45 +99,63 @@ export const MonacoEditorLSP: React.FC = () => {
       webSocket.onmessage = (event) => {
         console.log('Received message:', event.data);
         
-        // Parse LSP message (handle Content-Length header format)
+        // Parse LSP message (handle both Content-Length header format and raw JSON)
         const data = typeof event.data === 'string' ? event.data : String(event.data);
-        const contentMatch = data.match(/Content-Length: \d+\r\n\r\n(.*)/s);
-        if (contentMatch) {
-          try {
-            const message: LSPMessage = JSON.parse(contentMatch[1]);
-            console.log('Parsed LSP message:', message);
+        
+        try {
+          let message: LSPMessage;
+          
+          // Check if message starts with '{' (raw JSON)
+          if (data.trimStart().startsWith('{')) {
+            message = JSON.parse(data);
+            console.log('Parsed raw JSON message:', message);
+          } else {
+            // Parse Content-Length header format
+            const contentMatch = data.match(/Content-Length: \d+\r\n\r\n(.*)/s);
+            if (contentMatch) {
+              message = JSON.parse(contentMatch[1]);
+              console.log('Parsed LSP message with headers:', message);
+            } else {
+              console.warn('Received message in unrecognized format:', data);
+              return;
+            }
+          }
+          
+          // Handle initialize response
+          if (message.id === 1 && message.result) {
+            console.log('Received initialize response, sending initialized notification');
+            // Send initialized notification
+            sendLSPMessage({
+              jsonrpc: '2.0',
+              method: 'initialized',
+              params: {}
+            });
             
-            // Handle initialize response
-            if (message.id === 1 && message.result) {
-              // Send initialized notification
+            // Open the document
+            if (editorRef.current) {
+              console.log('Editor is ready, sending textDocument/didOpen');
+              const content = editorRef.current.getValue();
               sendLSPMessage({
                 jsonrpc: '2.0',
-                method: 'initialized',
-                params: {}
-              });
-              
-              // Open the document
-              if (editorRef.current) {
-                const content = editorRef.current.getValue();
-                sendLSPMessage({
-                  jsonrpc: '2.0',
-                  method: 'textDocument/didOpen',
-                  params: {
-                    textDocument: {
-                      uri: documentUri,
-                      languageId: 'lsptoy',
-                      version: documentVersion,
-                      text: content
-                    }
+                method: 'textDocument/didOpen',
+                params: {
+                  textDocument: {
+                    uri: documentUri,
+                    languageId: 'lsptoy',
+                    version: documentVersion,
+                    text: content
                   }
-                });
-              }
+                }
+              });
+            } else {
+              console.warn('Editor not ready yet, cannot send textDocument/didOpen');
             }
-          } catch (error) {
-            console.error('Error parsing LSP message:', error);
           }
+        } catch (error) {
+          console.error('Error parsing LSP message:', error);
         }
       };
+
 
       webSocket.onerror = (error) => {
         console.error('WebSocket error:', error);

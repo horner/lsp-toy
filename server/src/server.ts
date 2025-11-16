@@ -54,14 +54,21 @@ class WebSocketDuplex extends Duplex {
       logDebug(`[WebSocket] Received ${buffer.length} bytes from client (${this.mode})`);
       
       if (this.mode === 'raw-jsonrpc') {
-        // Wrap raw JSON-RPC in LSP protocol headers for StreamMessageReader
-        const contentLength = Buffer.byteLength(text, 'utf-8');
-        const wrapped = `Content-Length: ${contentLength}\r\n\r\n${text}`;
-        logDebug(`[WebSocket] Wrapping: ${text.substring(0, 100)}`);
-        this.push(Buffer.from(wrapped, 'utf-8'));
+        // Check if message starts with '{' - if so, wrap it
+        if (text.startsWith('{')) {
+          // Wrap raw JSON-RPC in LSP protocol headers for StreamMessageReader
+          const contentLength = Buffer.byteLength(text, 'utf-8');
+          const wrapped = `Content-Length: ${contentLength}\r\n\r\n${text}`;
+          logDebug(`[WebSocket] Wrapping JSON: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
+          this.push(Buffer.from(wrapped, 'utf-8'));
+        } else {
+          // Already has headers - pass through as-is
+          logDebug(`[WebSocket] Pass-through (has headers): ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
+          this.push(buffer);
+        }
       } else {
         // LSP protocol mode - pass through as-is
-        logDebug(`[WebSocket] Pass-through: ${text.substring(0, 100)}`);
+        logDebug(`[WebSocket] Pass-through: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
         this.push(buffer);
       }
     });
@@ -243,14 +250,14 @@ if (requestedPort !== null) {
     });
 
     // Initialize and start listening immediately
-    initializeLanguageServer(connection, stream).catch(error => {
+    initializeLanguageServer(connection, stream).then(() => {
+      // Start listening for messages only after handlers are registered
+      logDebug(`${clientId} Starting connection.listen()...`);
+      connection.listen();
+      logDebug(`${clientId} connection.listen() started`);
+    }).catch(error => {
       logDebug(`${clientId} initialization error:`, error);
     });
-    
-    // Start listening for messages right away
-    logDebug(`${clientId} Starting connection.listen()...`);
-    connection.listen();
-    logDebug(`${clientId} connection.listen() started`);
   });
 
   wss.on('error', (error) => {
