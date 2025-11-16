@@ -1,0 +1,263 @@
+import React, { useEffect, useRef, useState } from 'react';
+import Editor from '@monaco-editor/react';
+import * as monaco from 'monaco-editor';
+
+const LSP_WS_URL = 'ws://localhost:8080';
+
+interface LSPMessage {
+  jsonrpc: '2.0';
+  id?: number | string;
+  method?: string;
+  params?: any;
+  result?: any;
+  error?: any;
+}
+
+export const MonacoEditorLSP: React.FC = () => {
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const messageIdRef = useRef(1);
+  const [documentUri] = useState('file:///sample.lsptoy');
+  const [documentVersion, setDocumentVersion] = useState(0);
+
+  console.log('MonacoEditorLSP component rendering');
+
+  useEffect(() => {
+    return () => {
+      // Cleanup
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
+
+  const sendLSPMessage = (message: LSPMessage) => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      const jsonMessage = JSON.stringify(message);
+      console.log('Sending LSP message:', jsonMessage);
+      wsRef.current.send(`Content-Length: ${jsonMessage.length}\r\n\r\n${jsonMessage}`);
+    }
+  };
+
+  const connectToLanguageServer = () => {
+    setConnectionError(null);
+    
+    try {
+      const webSocket = new WebSocket(LSP_WS_URL);
+      wsRef.current = webSocket;
+      
+      webSocket.onopen = () => {
+        console.log('WebSocket connection established');
+        setIsConnected(true);
+
+        // Send initialize request
+        sendLSPMessage({
+          jsonrpc: '2.0',
+          id: messageIdRef.current++,
+          method: 'initialize',
+          params: {
+            processId: null,
+            clientInfo: {
+              name: 'Monaco LSP Toy Client',
+              version: '1.0.0'
+            },
+            rootUri: null,
+            capabilities: {
+              textDocument: {
+                synchronization: {
+                  dynamicRegistration: false,
+                  willSave: false,
+                  willSaveWaitUntil: false,
+                  didSave: false
+                },
+                completion: {
+                  dynamicRegistration: false,
+                  completionItem: {
+                    snippetSupport: true
+                  }
+                },
+                hover: {
+                  dynamicRegistration: false,
+                  contentFormat: ['plaintext', 'markdown']
+                }
+              }
+            }
+          }
+        });
+      };
+
+      webSocket.onmessage = (event) => {
+        console.log('Received message:', event.data);
+        
+        // Parse LSP message (handle Content-Length header format)
+        const data = typeof event.data === 'string' ? event.data : String(event.data);
+        const contentMatch = data.match(/Content-Length: \d+\r\n\r\n(.*)/s);
+        if (contentMatch) {
+          try {
+            const message: LSPMessage = JSON.parse(contentMatch[1]);
+            console.log('Parsed LSP message:', message);
+            
+            // Handle initialize response
+            if (message.id === 1 && message.result) {
+              // Send initialized notification
+              sendLSPMessage({
+                jsonrpc: '2.0',
+                method: 'initialized',
+                params: {}
+              });
+              
+              // Open the document
+              if (editorRef.current) {
+                const content = editorRef.current.getValue();
+                sendLSPMessage({
+                  jsonrpc: '2.0',
+                  method: 'textDocument/didOpen',
+                  params: {
+                    textDocument: {
+                      uri: documentUri,
+                      languageId: 'lsptoy',
+                      version: documentVersion,
+                      text: content
+                    }
+                  }
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing LSP message:', error);
+          }
+        }
+      };
+
+      webSocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
+        setConnectionError('Failed to connect to language server');
+        setIsConnected(false);
+      };
+
+      webSocket.onclose = () => {
+        console.log('WebSocket closed');
+        setIsConnected(false);
+        wsRef.current = null;
+      };
+    } catch (error) {
+      console.error('Error connecting to language server:', error);
+      setConnectionError(error instanceof Error ? error.message : 'Unknown error');
+      setIsConnected(false);
+    }
+  };
+
+  const handleEditorDidMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
+    console.log('Editor mounted successfully');
+    editorRef.current = editor;
+    
+    // Register the lsptoy language if not already registered
+    const languages = monaco.languages.getLanguages();
+    if (!languages.find((lang: any) => lang.id === 'lsptoy')) {
+      monaco.languages.register({ id: 'lsptoy' });
+    }
+
+    // Listen to content changes
+    editor.onDidChangeModelContent(() => {
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        const newVersion = documentVersion + 1;
+        setDocumentVersion(newVersion);
+        
+        sendLSPMessage({
+          jsonrpc: '2.0',
+          method: 'textDocument/didChange',
+          params: {
+            textDocument: {
+              uri: documentUri,
+              version: newVersion
+            },
+            contentChanges: [
+              {
+                text: editor.getValue()
+              }
+            ]
+          }
+        });
+      }
+    });
+
+    // Connect to language server after editor mounts
+    connectToLanguageServer();
+  };
+
+  const disconnectFromLanguageServer = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+      setIsConnected(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-900">
+      {/* Header */}
+      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">LSP Toy Monaco Editor</h1>
+            <p className="text-sm text-gray-400 mt-1">WebSocket LSP Client</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <div
+                className={`w-3 h-3 rounded-full ${
+                  isConnected ? 'bg-green-500' : 'bg-red-500'
+                }`}
+              />
+              <span className="text-sm text-gray-300">
+                {isConnected ? 'Connected' : 'Disconnected'}
+              </span>
+            </div>
+            {!isConnected ? (
+              <button
+                onClick={connectToLanguageServer}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Connect
+              </button>
+            ) : (
+              <button
+                onClick={disconnectFromLanguageServer}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm font-medium transition-colors"
+              >
+                Disconnect
+              </button>
+            )}
+          </div>
+        </div>
+        {connectionError && (
+          <div className="mt-3 px-4 py-2 bg-red-900/50 border border-red-700 rounded-lg">
+            <p className="text-sm text-red-200">Error: {connectionError}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Editor */}
+      <div className="flex-1 overflow-hidden">
+        <Editor
+          height="100%"
+          defaultLanguage="lsptoy"
+          defaultValue="# Welcome to LSP Toy Editor\n\nStart typing to see LSP features in action!\n"
+          theme="vs-dark"
+          onMount={handleEditorDidMount}
+          options={{
+            minimap: { enabled: true },
+            fontSize: 14,
+            lineNumbers: 'on',
+            scrollBeyondLastLine: false,
+            automaticLayout: true,
+            tabSize: 2,
+            insertSpaces: true,
+          }}
+        />
+      </div>
+    </div>
+  );
+};
