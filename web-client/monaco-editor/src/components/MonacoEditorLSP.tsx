@@ -42,7 +42,8 @@ export const MonacoEditorLSP: React.FC = () => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       const jsonMessage = JSON.stringify(message);
       console.log('Sending LSP message:', jsonMessage);
-      wsRef.current.send(`Content-Length: ${jsonMessage.length}\r\n\r\n${jsonMessage}`);
+      const contentLength = new TextEncoder().encode(jsonMessage).length;
+      wsRef.current.send(`Content-Length: ${contentLength}\r\n\r\n${jsonMessage}`);
     }
   };
 

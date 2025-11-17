@@ -24,9 +24,14 @@ function addMessageLogging(reader: MessageReader, writer: MessageWriter, label: 
   const originalListen = reader.listen.bind(reader);
   reader.listen = (callback) => {
     logDebug(`[${label}] Reader.listen() called, wrapping callback`);
+    let messageCount = 0;
     return originalListen((msg) => {
-      logDebug(`[${label} ← CLIENT] ${JSON.stringify(msg)}`);
+      messageCount++;
+      const msgAny = msg as any;
+      logDebug(`[${label} ← CLIENT #${messageCount}] Method: ${msgAny.method || 'response'}, ID: ${msgAny.id || 'N/A'}`);
+      logDebug(`[${label} ← CLIENT #${messageCount}] Full message: ${JSON.stringify(msg).substring(0, 300)}...`);
       callback(msg);
+      logDebug(`[${label}] Callback completed for message #${messageCount}`);
     });
   };
   
@@ -51,7 +56,8 @@ class WebSocketDuplex extends Duplex {
       const buffer = typeof data === 'string' ? Buffer.from(data, 'utf-8') : data;
       const text = buffer.toString('utf-8');
       
-      logDebug(`[WebSocket] Received ${buffer.length} bytes from client (${this.mode})`);
+      logDebug(`[WebSocket] ====== Received ${buffer.length} bytes from client (mode: ${this.mode}) ======`);
+      logDebug(`[WebSocket] First 50 chars: ${text.substring(0, 50)}`);
       
       if (this.mode === 'raw-jsonrpc') {
         // Check if message starts with '{' - if so, wrap it
@@ -59,13 +65,48 @@ class WebSocketDuplex extends Duplex {
           // Wrap raw JSON-RPC in LSP protocol headers for StreamMessageReader
           const contentLength = Buffer.byteLength(text, 'utf-8');
           const wrapped = `Content-Length: ${contentLength}\r\n\r\n${text}`;
-          logDebug(`[WebSocket] Wrapping JSON: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
-          this.push(Buffer.from(wrapped, 'utf-8'));
-        } else {
-          // Already has headers - pass through as-is
-          logDebug(`[WebSocket] Pass-through (has headers): ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
-          this.push(buffer);
+          logDebug(`[WebSocket] ✓ Wrapping JSON (${text.length} → ${wrapped.length} bytes)`);
+          logDebug(`[WebSocket] Pushing to stream: ${wrapped.substring(0, 200)}${wrapped.length > 200 ? '...' : ''}`);
+          const pushed = this.push(Buffer.from(wrapped, 'utf-8'));
+          logDebug(`[WebSocket] Push returned: ${pushed} (false means buffer is full)`);
+          return;
         }
+        
+        if (text.startsWith('Content-Length:')) {
+          // Already has headers - pass through as-is
+          // Verify the Content-Length header matches actual body length
+          const headerMatch = text.match(/^Content-Length: (\d+)\r\n\r\n/);
+          if (headerMatch) {
+            const declaredLength = parseInt(headerMatch[1], 10);
+            const headerLength = headerMatch[0].length;
+            const bodyLength = text.length - headerLength;
+            const actualBodyLength = Buffer.byteLength(text.substring(headerLength), 'utf-8');
+            
+            logDebug(`[WebSocket] ✓ Pass-through (has headers)`);
+            logDebug(`[WebSocket]   Declared Content-Length: ${declaredLength}`);
+            logDebug(`[WebSocket]   Header size: ${headerLength} bytes`);
+            logDebug(`[WebSocket]   Body string length: ${bodyLength} chars`);
+            logDebug(`[WebSocket]   Body byte length: ${actualBodyLength} bytes`);
+            logDebug(`[WebSocket]   Total message: ${text.length} chars / ${buffer.length} bytes`);
+            logDebug(`[WebSocket]   Content preview: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
+            
+            if (declaredLength !== actualBodyLength) {
+              logDebug(`[WebSocket]   ⚠️  WARNING: Content-Length mismatch! Declared ${declaredLength} but actual is ${actualBodyLength}`);
+            }
+          } else {
+            logDebug(`[WebSocket] ✓ Pass-through (has headers): ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
+          }
+          
+          const pushed = this.push(buffer);
+          logDebug(`[WebSocket] Push returned: ${pushed}`);
+          return;
+        }
+        
+        // Malformed message - log warning and drop it
+        logDebug(`[WebSocket] ✗ WARNING: Malformed message (doesn't start with '{' or 'Content-Length:')`);
+        logDebug(`[WebSocket] First 100 chars: ${text.substring(0, 100)}`);
+        logDebug(`[WebSocket] Dropping malformed message`);
+        return;
       } else {
         // LSP protocol mode - pass through as-is
         logDebug(`[WebSocket] Pass-through: ${text.substring(0, 200)}${text.length > 200 ? '...' : ''}`);
@@ -82,8 +123,9 @@ class WebSocketDuplex extends Duplex {
     });
   }
 
-  _read(_size: number): void {
+  _read(size: number): void {
     // No-op: data is pushed when received
+    logDebug(`[WebSocket] _read() called with size: ${size}`);
   }
 
   _write(chunk: any, _encoding: string, callback: (error?: Error | null) => void): void {
@@ -233,6 +275,15 @@ if (requestedPort !== null) {
 
     const stream = new WebSocketDuplex(ws);
     
+    // Add error handler to the stream itself to catch parse/protocol errors
+    stream.on('error', (error) => {
+      logDebug(`${clientId} Stream error:`, error.message);
+      // Close the WebSocket on stream errors to prevent zombie connections
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
+    
     const reader = new StreamMessageReader(stream);
     const writer = new StreamMessageWriter(stream);
     addMessageLogging(reader, writer, clientId);
@@ -243,10 +294,14 @@ if (requestedPort !== null) {
 
     ws.on('close', () => {
       logDebug(`${clientId} disconnected`);
+      // Ensure stream is properly closed
+      stream.destroy();
     });
 
     ws.on('error', (error) => {
-      logDebug(`${clientId} error:`, error.message);
+      logDebug(`${clientId} WebSocket error:`, error.message);
+      // Destroy stream on WebSocket errors
+      stream.destroy(error);
     });
 
     // Initialize and start listening immediately
@@ -257,6 +312,10 @@ if (requestedPort !== null) {
       logDebug(`${clientId} connection.listen() started`);
     }).catch(error => {
       logDebug(`${clientId} initialization error:`, error);
+      // Close WebSocket on initialization failure
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     });
   });
 
