@@ -368,6 +368,12 @@ if (requestedPort !== null) {
   const stdioConnection = createConnection(ProposedFeatures.all, reader, writer);
   
   logDebug('stdio connection created with logging, initializing language server...');
-  initializeLanguageServer(stdioConnection);
-  logDebug('Language server initialization started (async)');
+  initializeLanguageServer(stdioConnection).then(() => {
+    logDebug('STDIO: Starting connection.listen()...');
+    stdioConnection.listen();
+    logDebug('STDIO: connection.listen() started');
+  }).catch(error => {
+    logDebug('STDIO: initialization error:', error);
+    process.exit(1);
+  });
 }
