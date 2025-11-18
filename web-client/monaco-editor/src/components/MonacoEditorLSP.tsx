@@ -214,10 +214,31 @@ export const MonacoEditorLSP: React.FC = () => {
     }
 
     // Listen to content changes
-    editor.onDidChangeModelContent(() => {
+    editor.onDidChangeModelContent((e) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
         const newVersion = documentVersion + 1;
         setDocumentVersion(newVersion);
+        
+        const model = editor.getModel();
+        if (!model) return;
+        
+        // Convert Monaco's content changes to LSP incremental changes
+        const contentChanges = e.changes.map((change) => {
+          return {
+            range: {
+              start: {
+                line: change.range.startLineNumber - 1,
+                character: change.range.startColumn - 1
+              },
+              end: {
+                line: change.range.endLineNumber - 1,
+                character: change.range.endColumn - 1
+              }
+            },
+            rangeLength: change.rangeLength,
+            text: change.text
+          };
+        });
         
         sendLSPMessage({
           jsonrpc: '2.0',
@@ -227,11 +248,7 @@ export const MonacoEditorLSP: React.FC = () => {
               uri: documentUri,
               version: newVersion
             },
-            contentChanges: [
-              {
-                text: editor.getValue()
-              }
-            ]
+            contentChanges: contentChanges
           }
         });
       }
