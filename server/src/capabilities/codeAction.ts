@@ -17,12 +17,14 @@ export function registerCodeActionProvider(connection: Connection, documentManag
     const actions: CodeAction[] = [];
 
     for (const diagnostic of params.context.diagnostics) {
-      const data = diagnostic.data as { kind?: string; label?: string } | undefined;
+      logDebug('  Diagnostic:', JSON.stringify(diagnostic));
+      const data = diagnostic.data as { kind?: string; label?: string; keyword?: string } | undefined;
+      logDebug('  Diagnostic data:', JSON.stringify(data));
       if (data?.kind === 'todo') {
         logDebug('  → Creating "Mark TODO as done" action');
         const edit: WorkspaceEdit = {
           changes: {
-            [params.textDocument.uri]: [TextEdit.replace(diagnostic.range, 'Done')]
+            [params.textDocument.uri]: [TextEdit.replace(diagnostic.range, '[X]')]
           }
         };
         actions.push({
