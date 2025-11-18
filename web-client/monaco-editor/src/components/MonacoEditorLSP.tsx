@@ -20,6 +20,7 @@ interface LSPMessage {
 
 export const MonacoEditorLSP: React.FC = () => {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<typeof monaco | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
@@ -152,6 +153,31 @@ export const MonacoEditorLSP: React.FC = () => {
               console.warn('Editor not ready yet, cannot send textDocument/didOpen');
             }
           }
+          
+          // Handle diagnostics
+          if (message.method === 'textDocument/publishDiagnostics' && monacoRef.current && editorRef.current) {
+            const diagnostics = message.params?.diagnostics || [];
+            const model = editorRef.current.getModel();
+            
+            if (model) {
+              const markers = diagnostics.map((diag: any) => ({
+                severity: diag.severity === 1 ? monacoRef.current!.MarkerSeverity.Error :
+                          diag.severity === 2 ? monacoRef.current!.MarkerSeverity.Warning :
+                          diag.severity === 3 ? monacoRef.current!.MarkerSeverity.Info :
+                          monacoRef.current!.MarkerSeverity.Hint,
+                startLineNumber: diag.range.start.line + 1,
+                startColumn: diag.range.start.character + 1,
+                endLineNumber: diag.range.end.line + 1,
+                endColumn: diag.range.end.character + 1,
+                message: diag.message,
+                code: diag.code,
+                source: diag.source || 'lsptoy'
+              }));
+              
+              monacoRef.current.editor.setModelMarkers(model, 'lsptoy', markers);
+              console.log('Set', markers.length, 'diagnostic markers');
+            }
+          }
         } catch (error) {
           console.error('Error parsing LSP message:', error);
         }
@@ -176,14 +202,15 @@ export const MonacoEditorLSP: React.FC = () => {
     }
   };
 
-  const handleEditorDidMount = (editor: monaco.editor.IStandaloneCodeEditor) => {
+  const handleEditorDidMount = (editor: monaco.editor.IStandaloneCodeEditor, monacoInstance: typeof monaco) => {
     console.log('Editor mounted successfully');
     editorRef.current = editor;
+    monacoRef.current = monacoInstance;
     
     // Register the lsptoy language if not already registered
-    const languages = monaco.languages.getLanguages();
+    const languages = monacoInstance.languages.getLanguages();
     if (!languages.find((lang: any) => lang.id === 'lsptoy')) {
-      monaco.languages.register({ id: 'lsptoy' });
+      monacoInstance.languages.register({ id: 'lsptoy' });
     }
 
     // Listen to content changes
