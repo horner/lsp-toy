@@ -54,6 +54,7 @@ export function getTodoKeywords(): string[] {
 export function findTodoMatches(text: string): Array<{ keyword: string; index: number; length: number }> {
   const keywords = getTodoKeywords();
   const matches: Array<{ keyword: string; index: number; length: number }> = [];
+  const seen = new Set<number>(); // Track positions we've already matched
   
   for (const keyword of keywords) {
     let index = text.indexOf(keyword);
@@ -63,8 +64,9 @@ export function findTodoMatches(text: string): Array<{ keyword: string; index: n
       const after = index + keyword.length < text.length ? text[index + keyword.length] : ' ';
       const isWholeWord = /\s|^/.test(before) && /\s|$|:/.test(after);
       
-      if (isWholeWord) {
+      if (isWholeWord && !seen.has(index)) {
         matches.push({ keyword, index, length: keyword.length });
+        seen.add(index);
       }
       index = text.indexOf(keyword, index + 1);
     }

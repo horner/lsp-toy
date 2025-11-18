@@ -52,10 +52,18 @@ function validateTextDocument(document: TextDocument, connection: Connection, do
   let inlineNodeCount = 0;
   let linkNodeCount = 0;
   
+  const seenInlineNodes = new Set<string>(); // Track visited inline nodes
+  
   visitTree(tree.rootNode, node => {
     // Check for TODO in inline nodes (tree-sitter-grammars uses 'inline' instead of 'text')
     if (node.type === 'inline') {
       inlineNodeCount++;
+      const nodeKey = `${node.startIndex}-${node.endIndex}`;
+      if (seenInlineNodes.has(nodeKey)) {
+        logDebug(`  ⚠️  Skipping duplicate inline node at ${node.startIndex}-${node.endIndex}: "${node.text?.substring(0, 50)}"`);
+        return; // Skip processing this duplicate node
+      }
+      seenInlineNodes.add(nodeKey);
       addTodoDiagnostics(document, node, diagnostics);
     }
 
