@@ -10,32 +10,101 @@ LSP Toy VSCode extension
 
 ## ✨ Features
 
-� **Embedded Language Support** ✨ NEW  
-Rich IDE features inside Markdown code fences! Get completions, hover info, and diagnostics for TypeScript, Python, Rust, Go, and more—all within your Markdown documents. [Learn more →](EMBEDDED_README.md)
+### 🚀 Embedded Language Support ✨ NEW
+Rich IDE features inside Markdown code fences! Get completions, hover info, and diagnostics for TypeScript, Python, Rust, Go, and more—all within your Markdown documents. [Learn more →](docs/features/EMBEDDED_README.md)
 
-�🔍 **Diagnostics**  
-Warns on `TODO` comments and relative links that do not resolve on disk. Highlights `TODO` lines and `[Project](./missing.md)` as warnings.
+### 📋 LSP Capabilities
 
-⚡ **Code Actions**  
-Offers focused quick fixes for diagnostics. "Mark TODO as done" or "Remove broken link".
+LSP-Toy implements the following Language Server Protocol capabilities:
 
-💡 **Completions**  
-Suggests resume sections and Markdown formatting as you type. Trigger with `#` or `[` for headings, links, and formatting snippets.
+#### 1. 📝 **Text Document Synchronization**
+- **Mode**: Incremental sync (`TextDocumentSyncKind.Incremental`)
+- **Implementation**: Efficiently tracks document changes with delta updates
+- **Handles**: `didOpen`, `didChange`, `didClose` notifications
 
-📖 **Hover**  
-Displays helpful tooltips for well-known technologies and links. Hover `Rust` to see a short description.
+#### 2. 🔍 **Diagnostics** (`textDocument/publishDiagnostics`)
+- **TODO Detection**: Finds `TODO`, `PENDIENTE`, `À FAIRE`, `ZROBIĆ` and other international variants
+  - Warns on unfinished tasks in your document
+  - Uses tree-sitter AST to accurately detect inline nodes
+  - Deduplicates matches at the same position
+- **Broken Link Detection**: Validates relative links (e.g., `[Project](./missing.md)`)
+  - Checks if referenced files exist on disk
+  - Warns when links point to non-existent files
+- **Internationalized Messages**: All diagnostic messages respect VS Code locale settings
+- **Example**: Line with `TODO: Complete this section` shows a warning squiggle
 
-✏️ **Signature Help**  
-Guides pseudo calls such as `contact("Jane", "Doe")`. Shows parameter names and descriptions while typing.
+#### 3. ⚡ **Code Actions** (`textDocument/codeAction`)
+- **Quick Fixes** for diagnostics:
+  - **"Mark TODO as done"**: Replaces `TODO` with `[X]` to mark completion
+  - Triggered via lightbulb icon or `Cmd+.` / `Ctrl+.`
+- **Implementation**: 
+  - Uses `WorkspaceEdit` to apply text changes
+  - Provides `CodeActionKind.QuickFix` actions
+  - Preserves diagnostic context with custom data field
 
-🎨 **Semantic Tokens**  
-Adds semantic coloring for headings, emphasis, links, code spans, and TODOs. Headings/bold/links receive dedicated token types.
+#### 4. 💡 **Completions** (`textDocument/completion`)
+- **Trigger Characters**: `#`, `[`, ` `, `.`, `-`
+- **Context-Aware Suggestions**:
+  - **Heading completions** (trigger: `#`): Suggests resume sections like "## Experience", "## Education"
+  - **Link completions** (trigger: `[`): Provides Markdown link syntax snippets
+  - **Formatting snippets**: Bold, italic, code spans
+- **Resolve Support**: `completionItem/resolve` for additional details
+- **Example**: Type `#` and get suggestions for "# Summary", "## Skills", etc.
 
-🌳 **Tree-sitter AST**  
-Uses the `tree-sitter-markdown` grammar (via WASM) for parsing instead of regex heuristics. Diagnostics and tokens stay in sync with the Markdown structure.
+#### 5. 📖 **Hover** (`textDocument/hover`)
+- **Technology Tooltips**: Hover over technology names (e.g., "TypeScript", "Rust") for descriptions
+- **Link Information**: Hover over links to see target URLs
+- **Markdown Support**: Rich hover content with code examples and formatting
+- **Internationalized**: Hover text respects locale settings
+- **Example**: Hover "React" shows "A JavaScript library for building user interfaces"
 
-🌍 **Locale Support**  
-Respects client locale preferences for internationalized messages. Diagnostic messages appear in Spanish, French, etc. based on VS Code's language.
+#### 6. ✏️ **Signature Help** (`textDocument/signatureHelp`)
+- **Trigger Characters**: `(`, `,`
+- **Pseudo-Function Guidance**: Shows parameter hints for demonstration functions
+- **Example**: Type `contact(` to see `contact(firstName: string, lastName: string)`
+- **Parameter Info**: Highlights current parameter as you type
+- **Use Case**: Educational demonstration of signature help functionality
+
+#### 7. 🎨 **Semantic Tokens** (`textDocument/semanticTokens/full`)
+- **Token Types**:
+  - `heading` - Markdown headings (# through ######)
+  - `bold` - Bold text (**text**)
+  - `italic` - Italic text (*text*)
+  - `link` - Hyperlinks and references
+  - `code` - Inline code spans (`code`)
+  - `todo` - TODO keywords
+- **Implementation**: Tree-sitter AST traversal for accurate token detection
+- **Benefits**: Consistent syntax highlighting across all themes
+- **Example**: Headings colored differently from regular text, TODOs highlighted
+
+#### 8. 🏷️ **Inlay Hints** (`textDocument/inlayHint`)
+- **Status**: Registered but not yet implemented
+- **Planned**: Word count hints, link validation indicators, heading level markers
+
+#### 9. 🌳 **Document Symbols** (`textDocument/documentSymbol`)
+- **Provides**: Document outline with hierarchical structure
+- **Symbol Types**: Headings organized by level
+- **Navigation**: Jump to sections via VS Code outline view
+- **Example**: See all `##` headings in the document outline panel
+
+### 🏗️ Core Technologies
+
+#### 🌳 **Tree-sitter AST Parsing**
+- Uses `tree-sitter-markdown` grammar compiled to WASM
+- Provides accurate, structure-aware parsing (not regex-based)
+- All capabilities built on top of AST traversal
+- **Benefits**: 
+  - Precise token boundaries
+  - Correct nesting and structure
+  - Resilient to malformed input
+
+#### 🌍 **Internationalization (i18n)**
+- **Implementation**: i18next with JSON translation files
+- **Supported Languages**: English, Spanish, French, Polish
+- **Scope**: All diagnostic messages, completions, and hover text
+- **Auto-detection**: Reads VS Code's `locale` setting from initialization
+- **Pluralization**: Proper plural forms for all supported languages
+- **Example**: `TODO` diagnostic shows "Elemento TODO encontrado" in Spanish
 
 ## 🔄 LSP Architecture
 
@@ -104,14 +173,6 @@ Inside Markdown code fences, lsp-toy automatically:
 4. Remaps ranges back to host document coordinates
 
 **[→ Learn more about embedded languages](EMBEDDED_README.md)**
-
-## 🚀 Getting started
-
-```bash
-npm install
-npm run fetch:wasm   # Download prebuilt WASM files
-npm run compile
-```
 
 ### Running Modes
 
@@ -197,6 +258,17 @@ go install golang.org/x/tools/gopls@latest    # Go
 ```
 
 **[→ Full language support guide](scripts/README.md)**
+
+## 🚀 Getting started
+
+```bash
+npm install
+npm run fetch:wasm   # Download prebuilt WASM files
+npm run compile
+```
+
+> **Note**
+> The language server depends on Tree-sitter's native bindings. If `npm install` fails with a C++ compiler error, rerun the command with `CXXFLAGS="-std=c++20" npm install` to enable C++20 support during the build.
 
 ## ✨ Features
 
