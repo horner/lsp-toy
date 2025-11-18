@@ -213,6 +213,116 @@ export const MonacoEditorLSP: React.FC = () => {
       monacoInstance.languages.register({ id: 'lsptoy' });
     }
 
+    // Register completion provider
+    monacoInstance.languages.registerCompletionItemProvider('lsptoy', {
+      triggerCharacters: [' ', '.', '-', '#', '['],
+      provideCompletionItems: async (_model, position, context) => {
+        console.log('Completion requested at position:', position, 'trigger:', context.triggerCharacter);
+        
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          console.warn('Cannot request completions: WebSocket not connected');
+          return { suggestions: [] };
+        }
+
+        // Send completion request to LSP server
+        const completionId = messageIdRef.current++;
+        
+        return new Promise((resolve) => {
+          // Set up one-time message handler for this completion request
+          const ws = wsRef.current!;
+          const originalOnMessage = ws.onmessage;
+          
+          const handleCompletionResponse = (event: MessageEvent) => {
+            const data = typeof event.data === 'string' ? event.data : String(event.data);
+            
+            try {
+              let message: LSPMessage;
+              
+              if (data.trimStart().startsWith('{')) {
+                message = JSON.parse(data);
+              } else {
+                const contentMatch = data.match(/Content-Length: \d+\r\n\r\n(.*)/s);
+                if (contentMatch) {
+                  message = JSON.parse(contentMatch[1]);
+                } else {
+                  if (originalOnMessage) originalOnMessage.call(ws, event);
+                  return;
+                }
+              }
+              
+              // Check if this is our completion response
+              if (message.id === completionId && message.result !== undefined) {
+                console.log('Received completion response:', message.result);
+                
+                // Convert LSP completion items to Monaco suggestions
+                const items = Array.isArray(message.result) ? message.result : message.result?.items || [];
+                const suggestions = items.map((item: any) => ({
+                  label: item.label,
+                  kind: item.kind || monacoInstance.languages.CompletionItemKind.Text,
+                  insertText: item.insertText || item.label,
+                  insertTextRules: item.insertTextFormat === 2 
+                    ? monacoInstance.languages.CompletionItemInsertTextRule.InsertAsSnippet 
+                    : undefined,
+                  detail: item.detail,
+                  documentation: item.documentation,
+                  sortText: item.sortText,
+                  filterText: item.filterText,
+                  range: undefined // Let Monaco determine the range
+                }));
+                
+                console.log('Converted to Monaco suggestions:', suggestions);
+                resolve({ suggestions });
+                
+                // Restore original handler
+                if (wsRef.current) {
+                  wsRef.current.onmessage = originalOnMessage;
+                }
+              } else {
+                // Not our message, pass to original handler
+                if (originalOnMessage) originalOnMessage.call(ws, event);
+              }
+            } catch (error) {
+              console.error('Error parsing completion response:', error);
+              if (originalOnMessage) originalOnMessage.call(ws, event);
+            }
+          };
+          
+          // Temporarily override the message handler
+          if (wsRef.current) {
+            wsRef.current.onmessage = handleCompletionResponse;
+          }
+          
+          // Send the completion request
+          sendLSPMessage({
+            jsonrpc: '2.0',
+            id: completionId,
+            method: 'textDocument/completion',
+            params: {
+              textDocument: {
+                uri: documentUri
+              },
+              position: {
+                line: position.lineNumber - 1,
+                character: position.column - 1
+              },
+              context: {
+                triggerKind: context.triggerKind,
+                triggerCharacter: context.triggerCharacter
+              }
+            }
+          });
+          
+          // Timeout after 5 seconds
+          setTimeout(() => {
+            if (wsRef.current) {
+              wsRef.current.onmessage = originalOnMessage;
+            }
+            resolve({ suggestions: [] });
+          }, 5000);
+        });
+      }
+    });
+
     // Listen to content changes
     editor.onDidChangeModelContent((e) => {
       if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
