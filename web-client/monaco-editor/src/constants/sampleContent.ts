@@ -1,280 +1,45 @@
-export const SAMPLE_LSPTOY_CONTENT = `# Jane Doe
+export const SAMPLE_LSPTOY_CONTENT = `# LSP Toy Demo
 
-**Email:** [jane.doe@example.com](mailto:jane.doe@example.com)  
-**Website:** [https://janedoe.dev](https://janedoe.dev)
-
-> 🚀 **Try this:** Hover over line 1 to see document tree outline. Type inside TypeScript code fences for completion!
+> 🚀 **Try typing \`#\` to see heading completions!**
 
 ## Summary
-Full-stack engineer exploring **Rust**, **TypeScript**, and _language servers_.
 
-> TODO: Add personal mission statement.
+This is a demo of LSP Toy's features:
+- Completions for headings and links
+- Embedded TypeScript support
+- Internationalized diagnostics
 
-## Skills
-- **Languages:** JavaScript, TypeScript, Python, Rust
-- **Tools:** Docker, Git, Kubernetes
-- [Project Report](./acme-report.md) <!-- intentional broken link -->
+TODO: Explore the features below
 
-## Code Examples
+## Code Example
 
-### Test: Unsupported Language (Ruby)
-
-Hover over any code below to see helpful hint about missing language server:
-
-\`\`\`ruby
-def greet(name)
-  puts "Hello, #{name}!"
-end
-
-greet("World")
-\`\`\`
-
-### TypeScript/JavaScript Projects
-
-Here's a TypeScript utility I built for data validation:
+Try typing inside this code fence to get TypeScript completions:
 
 \`\`\`typescript
 interface User {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'user' | 'guest';
 }
 
-function validateUser(data: unknown): User | null {
-  if (typeof data !== 'object' || data === null) {
-    return null;
-  }
-  
-  const user = data as User;
-  
-  if (typeof user.id !== 'number' || 
-      typeof user.name !== 'string' ||
-      typeof user.email !== 'string') {
-    return null;
-  }
-  
-  return user;
+function greet(user: User): string {
+  return \`Hello, \${user.name}!\`;
 }
 
-// Test: hover over 'validateUser' to see signature
-// Test: type 'user.' after the assignment to see completions
-const user = validateUser({ id: 1, name: "Jane", email: "jane@example.com", role: "admin" });
+// Type 'user.' below to see completions
+const user = { id: 1, name: "Jane", email: "jane@example.com" };
 \`\`\`
 
-### Python Data Processing
+## Internationalization
 
-A Python script for analyzing log files:
+The LSP server supports multiple languages for diagnostics:
 
-\`\`\`python
-from typing import List, Dict, Optional
-from datetime import datetime
+- **English:** TODO: Complete this task
+- **Spanish:** PENDIENTE: Completar esta tarea
+- **French:** À FAIRE: Terminer cette tâche
+- **Polish:** ZROBIĆ: Ukończyć to zadanie
 
-class LogAnalyzer:
-    """Analyzes server log files and generates statistics."""
-    
-    def __init__(self, log_file: str):
-        self.log_file = log_file
-        self.entries: List[Dict[str, str]] = []
-    
-    def parse_logs(self) -> None:
-        """Parse log entries from the file."""
-        with open(self.log_file, 'r') as f:
-            for line in f:
-                entry = self._parse_line(line)
-                if entry:
-                    self.entries.append(entry)
-    
-    def _parse_line(self, line: str) -> Optional[Dict[str, str]]:
-        """Parse a single log line."""
-        parts = line.strip().split(' - ')
-        if len(parts) < 3:
-            return None
-        
-        return {
-            'timestamp': parts[0],
-            'level': parts[1],
-            'message': parts[2]
-        }
-    
-    def get_error_count(self) -> int:
-        """Count the number of error entries."""
-        return sum(1 for entry in self.entries if entry['level'] == 'ERROR')
+## Broken Link Test
 
-# Test: type 'analyzer.' to see available methods
-analyzer = LogAnalyzer('/var/log/app.log')
-\`\`\`
-
-### Rust Performance-Critical Code
-
-Rust implementation for high-performance data structures:
-
-\`\`\`rust
-use std::collections::HashMap;
-
-#[derive(Debug, Clone)]
-pub struct Cache<K, V> {
-    store: HashMap<K, V>,
-    max_size: usize,
-}
-
-impl<K: std::hash::Hash + Eq, V> Cache<K, V> {
-    pub fn new(max_size: usize) -> Self {
-        Cache {
-            store: HashMap::new(),
-            max_size,
-        }
-    }
-    
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        if self.store.len() >= self.max_size && !self.store.contains_key(&key) {
-            // Simple eviction: remove first entry
-            if let Some(k) = self.store.keys().next().cloned() {
-                self.store.remove(&k);
-            }
-        }
-        self.store.insert(key, value)
-    }
-    
-    pub fn get(&self, key: &K) -> Option<&V> {
-        self.store.get(key)
-    }
-    
-    pub fn len(&self) -> usize {
-        self.store.len()
-    }
-}
-
-// Test: hover over 'Cache' to see struct definition
-// Test: type 'cache.' to see available methods
-\`\`\`
-
-### Database Queries (SQL)
-
-Example SQL queries for user management:
-
-\`\`\`sql
--- Create users table with indexes
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    role VARCHAR(50) DEFAULT 'user'
-);
-
--- Create index on email for faster lookups
-CREATE INDEX idx_users_email ON users(email);
-
--- Query active admin users
-SELECT 
-    id,
-    name,
-    email,
-    created_at
-FROM users
-WHERE 
-    role = 'admin' 
-    AND created_at > NOW() - INTERVAL '30 days'
-ORDER BY created_at DESC;
-\`\`\`
-
-### Configuration Files (YAML)
-
-Kubernetes deployment configuration:
-
-\`\`\`yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: web-app
-  labels:
-    app: web-app
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: web-app
-  template:
-    metadata:
-      labels:
-        app: web-app
-    spec:
-      containers:
-      - name: web-app
-        image: web-app:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: DATABASE_URL
-          valueFrom:
-            secretKeyRef:
-              name: db-credentials
-              key: url
-        resources:
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-\`\`\`
-
-### Shell Scripts (Bash)
-
-Deployment automation script:
-
-\`\`\`bash
-#!/bin/bash
-set -e
-
-APP_NAME="web-app"
-VERSION=\${1:-"latest"}
-DEPLOY_ENV=\${2:-"staging"}
-
-echo "Deploying $APP_NAME version $VERSION to $DEPLOY_ENV"
-
-# Build Docker image
-docker build -t "$APP_NAME:$VERSION" .
-
-# Push to registry
-docker tag "$APP_NAME:$VERSION" "registry.example.com/$APP_NAME:$VERSION"
-docker push "registry.example.com/$APP_NAME:$VERSION"
-
-# Deploy to Kubernetes
-kubectl set image "deployment/$APP_NAME" \\
-  "$APP_NAME=registry.example.com/$APP_NAME:$VERSION" \\
-  --namespace="$DEPLOY_ENV"
-
-echo "Deployment complete!"
-\`\`\`
-
-## Internationalization Examples
-
-> Each TODO keyword below uses native language equivalents and shows localized diagnostic messages:
-
-**English:** TODO: Review the quarterly performance metrics and prepare summary.
-
-**Spanish:** PENDIENTE: Revisar las métricas de rendimiento trimestrales y preparar resumen.
-
-**French:** À FAIRE: Examiner les métriques de performance trimestrielles et préparer un résumé.
-
-**Polish:** ZROBIĆ: Przejrzeć kwartalne wskaźniki wydajności i przygotować podsumowanie.
-
-> Additional TODO keywords supported:
-> - English: TODO, FIXME, BUG, HACK, NOTE, WARNING
-> - Spanish: PENDIENTE, ARREGLAR, CORREGIR, NOTA, ADVERTENCIA  
-> - French: AFAIRE, À FAIRE, CORRIGER, RÉPARER, NOTE, ATTENTION
-> - Polish: ZROBIĆ, NAPRAWIĆ, POPRAWIĆ, UWAGA, NOTATKA
-
-**More examples:**
-- FIXME: Update contact information
-- ARREGLAR: Actualizar información de contacto  
-- CORRIGER: Mettre à jour les informations de contact
-- NAPRAWIĆ: Zaktualizować informacje kontaktowe
-
-> More broken links for testing:
-> - [Missing File ES](./archivo-perdido.md)
-> - [Fichier Manquant FR](./fichier-manquant.md)  
-> - [Brakujący Plik PL](./brakujacy-plik.md)
-
-## Contact
-Reach me via \`contact("Jane", "Doe")\`
+[Missing Document](./missing.md)
 `;
