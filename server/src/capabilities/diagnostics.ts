@@ -11,7 +11,7 @@ import { logDebug } from '../utils/logging';
 export function setupDocumentHandlers(connection: Connection, documentManager: DocumentManager & { textDocuments: any }): void {
   documentManager.textDocuments.onDidOpen((e: TextDocumentChangeEvent<TextDocument>) => {
     logDebug('Document opened:', e.document.uri);
-    validateTextDocument(e.document, connection, documentManager);
+    // Note: onDidChangeContent is also fired when a document is opened, so validation happens there
   });
 
   documentManager.textDocuments.onDidChangeContent((e: TextDocumentChangeEvent<TextDocument>) => {
