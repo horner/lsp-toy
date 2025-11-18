@@ -27,6 +27,8 @@ export const MonacoEditorLSP: React.FC = () => {
   const messageIdRef = useRef(1);
   const [documentUri] = useState('file:///sample.lsptoy');
   const [documentVersion, setDocumentVersion] = useState(0);
+  // Store diagnostic data separately since Monaco markers don't support custom data
+  const diagnosticDataMapRef = useRef<Map<string, any>>(new Map());
 
   console.log('MonacoEditorLSP component rendering');
 
@@ -91,6 +93,14 @@ export const MonacoEditorLSP: React.FC = () => {
                 hover: {
                   dynamicRegistration: false,
                   contentFormat: ['plaintext', 'markdown']
+                },
+                codeAction: {
+                  dynamicRegistration: false,
+                  codeActionLiteralSupport: {
+                    codeActionKind: {
+                      valueSet: ['quickfix', 'refactor', 'source']
+                    }
+                  }
                 }
               }
             }
@@ -160,19 +170,32 @@ export const MonacoEditorLSP: React.FC = () => {
             const model = editorRef.current.getModel();
             
             if (model) {
-              const markers = diagnostics.map((diag: any) => ({
-                severity: diag.severity === 1 ? monacoRef.current!.MarkerSeverity.Error :
-                          diag.severity === 2 ? monacoRef.current!.MarkerSeverity.Warning :
-                          diag.severity === 3 ? monacoRef.current!.MarkerSeverity.Info :
-                          monacoRef.current!.MarkerSeverity.Hint,
-                startLineNumber: diag.range.start.line + 1,
-                startColumn: diag.range.start.character + 1,
-                endLineNumber: diag.range.end.line + 1,
-                endColumn: diag.range.end.character + 1,
-                message: diag.message,
-                code: diag.code,
-                source: diag.source || 'lsptoy'
-              }));
+              // Clear old diagnostic data for this document
+              diagnosticDataMapRef.current.clear();
+              
+              const markers = diagnostics.map((diag: any) => {
+                // Store diagnostic data in our map
+                const key = `${diag.range.start.line}-${diag.range.start.character}-${diag.range.end.line}-${diag.range.end.character}-${diag.code}`;
+                if (diag.data) {
+                  diagnosticDataMapRef.current.set(key, diag.data);
+                }
+                
+                return {
+                  severity: diag.severity === 1 ? monacoRef.current!.MarkerSeverity.Error :
+                            diag.severity === 2 ? monacoRef.current!.MarkerSeverity.Warning :
+                            diag.severity === 3 ? monacoRef.current!.MarkerSeverity.Info :
+                            monacoRef.current!.MarkerSeverity.Hint,
+                  startLineNumber: diag.range.start.line + 1,
+                  startColumn: diag.range.start.character + 1,
+                  endLineNumber: diag.range.end.line + 1,
+                  endColumn: diag.range.end.character + 1,
+                  message: diag.message,
+                  code: diag.code,
+                  source: diag.source || 'lsptoy',
+                  relatedInformation: diag.relatedInformation,
+                  tags: diag.tags
+                };
+              });
               
               monacoRef.current.editor.setModelMarkers(model, 'lsptoy', markers);
               console.log('Set', markers.length, 'diagnostic markers');
@@ -212,6 +235,162 @@ export const MonacoEditorLSP: React.FC = () => {
     if (!languages.find((lang: any) => lang.id === 'lsptoy')) {
       monacoInstance.languages.register({ id: 'lsptoy' });
     }
+
+    // Register code action provider
+    monacoInstance.languages.registerCodeActionProvider('lsptoy', {
+      provideCodeActions: async (_model, range, context) => {
+        console.log('Code actions requested at range:', range, 'markers:', context.markers);
+        
+        if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+          console.warn('Cannot request code actions: WebSocket not connected');
+          return { actions: [], dispose: () => {} };
+        }
+
+        const codeActionId = messageIdRef.current++;
+        
+        return new Promise((resolve) => {
+          const ws = wsRef.current!;
+          const originalOnMessage = ws.onmessage;
+          
+          const handleCodeActionResponse = (event: MessageEvent) => {
+            const data = typeof event.data === 'string' ? event.data : String(event.data);
+            
+            try {
+              let message: LSPMessage;
+              
+              if (data.trimStart().startsWith('{')) {
+                message = JSON.parse(data);
+              } else {
+                const contentMatch = data.match(/Content-Length: \d+\r\n\r\n(.*)/s);
+                if (contentMatch) {
+                  message = JSON.parse(contentMatch[1]);
+                } else {
+                  if (originalOnMessage) originalOnMessage.call(ws, event);
+                  return;
+                }
+              }
+              
+              if (message.id === codeActionId && message.result !== undefined) {
+                console.log('Received code action response:', message.result);
+                
+                const codeActions = Array.isArray(message.result) ? message.result : [];
+                const actions = codeActions.map((action: any) => ({
+                  title: action.title,
+                  kind: action.kind,
+                  diagnostics: action.diagnostics,
+                  edit: action.edit,
+                  command: action.command,
+                  isPreferred: action.isPreferred
+                }));
+                
+                // Convert LSP workspace edits to Monaco actions
+                const model = editorRef.current?.getModel();
+                const monacoActions = actions.map((action: any) => ({
+                  title: action.title,
+                  kind: action.kind,
+                  diagnostics: action.diagnostics,
+                  edit: action.edit && model ? {
+                    edits: Object.entries(action.edit.changes || {}).flatMap(([_uri, edits]: [string, any]) =>
+                      (edits as any[]).map(edit => ({
+                        resource: model.uri,
+                        textEdit: {
+                          range: new monacoInstance.Range(
+                            edit.range.start.line + 1,
+                            edit.range.start.character + 1,
+                            edit.range.end.line + 1,
+                            edit.range.end.character + 1
+                          ),
+                          text: edit.newText
+                        },
+                        versionId: undefined
+                      }))
+                    )
+                  } : undefined
+                }));
+                
+                console.log('Converted to Monaco code actions:', monacoActions);
+                resolve({
+                  actions: monacoActions,
+                  dispose: () => {}
+                });
+                
+                if (wsRef.current) {
+                  wsRef.current.onmessage = originalOnMessage;
+                }
+              } else {
+                if (originalOnMessage) originalOnMessage.call(ws, event);
+              }
+            } catch (error) {
+              console.error('Error parsing code action response:', error);
+              if (originalOnMessage) originalOnMessage.call(ws, event);
+            }
+          };
+          
+          if (wsRef.current) {
+            wsRef.current.onmessage = handleCodeActionResponse;
+          }
+          
+          // Convert Monaco markers to LSP diagnostics
+          const diagnostics = context.markers.map(marker => {
+            // Retrieve diagnostic data from our map
+            const key = `${marker.startLineNumber - 1}-${marker.startColumn - 1}-${marker.endLineNumber - 1}-${marker.endColumn - 1}-${marker.code}`;
+            const data = diagnosticDataMapRef.current.get(key);
+            
+            return {
+              severity: marker.severity === monacoInstance.MarkerSeverity.Error ? 1 :
+                       marker.severity === monacoInstance.MarkerSeverity.Warning ? 2 :
+                       marker.severity === monacoInstance.MarkerSeverity.Info ? 3 : 4,
+              range: {
+                start: {
+                  line: marker.startLineNumber - 1,
+                  character: marker.startColumn - 1
+                },
+                end: {
+                  line: marker.endLineNumber - 1,
+                  character: marker.endColumn - 1
+                }
+              },
+              message: marker.message,
+              code: marker.code,
+              source: marker.source,
+              data: data // Include the diagnostic data if we have it
+            };
+          });
+          
+          sendLSPMessage({
+            jsonrpc: '2.0',
+            id: codeActionId,
+            method: 'textDocument/codeAction',
+            params: {
+              textDocument: {
+                uri: documentUri
+              },
+              range: {
+                start: {
+                  line: range.startLineNumber - 1,
+                  character: range.startColumn - 1
+                },
+                end: {
+                  line: range.endLineNumber - 1,
+                  character: range.endColumn - 1
+                }
+              },
+              context: {
+                diagnostics: diagnostics,
+                only: context.only
+              }
+            }
+          });
+          
+          setTimeout(() => {
+            if (wsRef.current) {
+              wsRef.current.onmessage = originalOnMessage;
+            }
+            resolve({ actions: [], dispose: () => {} });
+          }, 5000);
+        });
+      }
+    });
 
     // Register completion provider
     monacoInstance.languages.registerCompletionItemProvider('lsptoy', {
